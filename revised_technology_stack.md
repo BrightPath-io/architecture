@@ -4,14 +4,14 @@ Based on stakeholder feedback, this document outlines the revised technology sta
 
 ## Core Technology Changes
 
-| Component | Original Plan | Revised Plan | Impact |
+| Component | Plan  | Impact |
 |-----------|---------------|--------------|--------|
-| Frontend Language | TypeScript | JavaScript | Simplified development without static typing |
-| UI Framework | Tailwind CSS | Radix UI | More accessible, pre-built components with consistent design |
-| Cloud Provider | AWS | Digital Ocean | Simplified deployment and potentially lower costs |
-| Python Version | 3.10 | 3.12 | Access to newer Python features and performance improvements |
-| Authentication | JWT-based custom auth | Google OAuth | Simplified authentication with secure third-party provider |
-| Message Bus | Redis/Celery | Valkey | Modern message bus with improved performance |
+| Frontend Language |  JavaScript | Simplified development without static typing |
+| UI Framework |  Radix UI | More accessible, pre-built components with consistent design |
+| Cloud Provider |  Digital Ocean | Simplified deployment and potentially lower costs |
+| Python Version |  3.12 | Access to newer Python features and performance improvements |
+| Authentication |  Google OAuth | Simplified authentication with secure third-party provider |
+| Message Bus |  Valkey | Modern message bus with improved performance |
 
 ## Detailed Technology Stack
 
