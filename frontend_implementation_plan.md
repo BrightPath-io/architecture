@@ -6,14 +6,11 @@ This document outlines the detailed implementation plan for the BrightPath front
 
 ## Technology Stack
 
-- **Framework**: React 18+ with TypeScript
+- **Framework**: React 18+
 - **Build Tool**: Vite
 - **Routing**: React Router v6+
-- **State Management**: React Context API + hooks for most state, Redux Toolkit for complex global state
-- **Styling**: Tailwind CSS with custom theme
-- **Component Library**: Headless UI components with custom styling
-- **Form Handling**: React Hook Form with Zod validation
-- **API Client**: Axios with custom hooks
+- **State Management**: React Context API + hooks for most state, jotai (possibly) for complex state management
+- **Component Library**: Radix UI
 - **Testing**: Jest + React Testing Library
 - **Code Quality**: ESLint + Prettier
 
@@ -55,101 +52,83 @@ client/
 │   │       ├── ScheduleItem/
 │   │       └── ScheduleEditor/
 │   ├── context/
-│   │   ├── AuthContext.tsx
-│   │   ├── ScheduleContext.tsx
-│   │   ├── OnboardingContext.tsx
-│   │   └── FeedbackContext.tsx
+│   │   ├── AuthContext.jsx
+│   │   ├── ScheduleContext.jsx
+│   │   ├── OnboardingContext.jsx
+│   │   └── FeedbackContext.jsx
 │   ├── hooks/
-│   │   ├── useAuth.ts
-│   │   ├── useSchedule.ts
-│   │   ├── useForm.ts
-│   │   ├── useApi.ts
-│   │   └── useLocalStorage.ts
+│   │   ├── useAuth.js
+│   │   ├── useSchedule.js
+│   │   ├── useForm.js
+│   │   ├── useApi.js
+│   │   └── useLocalStorage.js
 │   ├── layouts/
-│   │   ├── MainLayout.tsx
-│   │   ├── AuthLayout.tsx
-│   │   ├── OnboardingLayout.tsx
-│   │   └── DashboardLayout.tsx
+│   │   ├── MainLayout.jsx
+│   │   ├── AuthLayout.jsx
+│   │   ├── OnboardingLayout.jsx
+│   │   └── DashboardLayout.jsx
 │   ├── pages/
-│   │   ├── auth/
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── RegisterPage.tsx
-│   │   │   └── ForgotPasswordPage.tsx
 │   │   ├── onboarding/
-│   │   │   ├── WelcomePage.tsx
-│   │   │   ├── QuestionnairePage.tsx
-│   │   │   ├── ChildProfilePage.tsx
-│   │   │   └── CompletionPage.tsx
+│   │   │   ├── WelcomePage.jsx
+│   │   │   ├── QuestionnairePage.jsx
+│   │   │   ├── ChildProfilePage.jsx
+│   │   │   └── CompletionPage.jsx
 │   │   ├── dashboard/
-│   │   │   ├── DashboardPage.tsx
-│   │   │   ├── SchedulePage.tsx
-│   │   │   ├── ResourcesPage.tsx
-│   │   │   └── SettingsPage.tsx
+│   │   │   ├── DashboardPage.jsx
+│   │   │   ├── SchedulePage.jsx
+│   │   │   ├── ResourcesPage.jsx
+│   │   │   └── SettingsPage.jsx
 │   │   ├── schedule/
-│   │   │   ├── ScheduleGeneratorPage.tsx
-│   │   │   ├── ScheduleEditorPage.tsx
-│   │   │   └── ScheduleDetailsPage.tsx
+│   │   │   ├── ScheduleGeneratorPage.jsx
+│   │   │   ├── ScheduleEditorPage.jsx
+│   │   │   └── ScheduleDetailsPage.jsx
 │   │   ├── profile/
-│   │   │   ├── UserProfilePage.tsx
-│   │   │   └── ChildProfilePage.tsx
-│   │   ├── HomePage.tsx
-│   │   ├── AboutPage.tsx
-│   │   └── NotFoundPage.tsx
+│   │   │   ├── UserProfilePage.jsx
+│   │   │   └── ChildProfilePage.jsx
+│   │   ├── HomePage.jsx
+│   │   ├── AboutPage.jsx
+│   │   └── NotFoundPage.jsx
 │   ├── services/
 │   │   ├── api/
-│   │   │   ├── client.ts
-│   │   │   ├── auth.ts
-│   │   │   ├── schedule.ts
-│   │   │   ├── user.ts
-│   │   │   ├── child.ts
-│   │   │   ├── feedback.ts
-│   │   │   └── resources.ts
+│   │   │   ├── client.js
+│   │   │   ├── auth.js
+│   │   │   ├── schedule.js
+│   │   │   ├── user.js
+│   │   │   ├── child.js
+│   │   │   ├── feedback.js
+│   │   │   └── resources.js
 │   │   └── storage/
-│   │       ├── localStorage.ts
-│   │       └── sessionStorage.ts
+│   │       ├── localStorage.js
+│   │       └── sessionStorage.js
 │   ├── types/
-│   │   ├── auth.ts
-│   │   ├── schedule.ts
-│   │   ├── user.ts
-│   │   ├── child.ts
-│   │   ├── feedback.ts
-│   │   └── resources.ts
+│   │   ├── auth.js
+│   │   ├── schedule.js
+│   │   ├── user.js
+│   │   ├── child.js
+│   │   ├── feedback.js
+│   │   └── resources.js
 │   ├── utils/
-│   │   ├── date.ts
-│   │   ├── validation.ts
-│   │   ├── formatting.ts
-│   │   └── testing.ts
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── routes.tsx
-│   └── vite-env.d.ts
+│   │   ├── date.js
+│   │   ├── validation.js
+│   │   ├── formatting.js
+│   │   └── testing.js
+│   ├── App.jsx
+│   ├── main.jsx
+│   ├── routes.jsx
+│   └── vite-env.d.js
 ├── .eslintrc.js
 ├── .prettierrc
 ├── index.html
 ├── package.json
-├── tailwind.config.js
-├── tsconfig.json
-└── vite.config.ts
+└── vite.config.js
 ```
 
 ## Key Features Implementation
 
 ### 1. Authentication System
 
-The authentication system will use JWT tokens with secure storage and automatic refresh.
+The authentication system will initially use Google OAuth.
 
-**Implementation Steps:**
-1. Create AuthContext for global auth state
-2. Implement login, register, and logout functionality
-3. Add token refresh mechanism
-4. Create protected routes with authentication guards
-5. Implement password reset flow
-
-**Key Components:**
-- `AuthContext.tsx` - Global auth state and methods
-- `useAuth.ts` - Custom hook for auth operations
-- `LoginPage.tsx` - User login interface
-- `RegisterPage.tsx` - New user registration
 
 ### 2. Onboarding Flow
 
@@ -163,10 +142,10 @@ The onboarding process will guide new users through setting up their profile and
 5. Create completion and success screens
 
 **Key Components:**
-- `OnboardingContext.tsx` - Manage onboarding state
-- `QuestionnaireStep.tsx` - Individual questionnaire steps
-- `LikertScale.tsx` - Likert scale input component
-- `ProgressIndicator.tsx` - Visual progress tracker
+- `OnboardingContext.jsx` - Manage onboarding state
+- `QuestionnaireStep.jsx` - Individual questionnaire steps
+- `LikertScale.jsx` - Likert scale input component
+- `ProgressIndicator.jsx` - Visual progress tracker
 
 ### 3. Schedule Dashboard
 
@@ -180,10 +159,10 @@ The dashboard will provide an overview of schedules and activities.
 5. Implement filtering and search capabilities
 
 **Key Components:**
-- `DashboardPage.tsx` - Main dashboard view
-- `Calendar.tsx` - Calendar component with multiple views
-- `ScheduleItem.tsx` - Individual schedule item
-- `ScheduleEditor.tsx` - Interface for editing schedules
+- `DashboardPage.jsx` - Main dashboard view
+- `Calendar.jsx` - Calendar component with multiple views
+- `ScheduleItem.jsx` - Individual schedule item
+- `ScheduleEditor.jsx` - Interface for editing schedules
 
 ### 4. Schedule Generation
 
@@ -197,10 +176,10 @@ The schedule generation feature will allow users to create new schedules based o
 5. Implement save and apply features
 
 **Key Components:**
-- `ScheduleGeneratorPage.tsx` - Schedule creation interface
-- `TemplateSelector.tsx` - Schedule template options
-- `CustomizationPanel.tsx` - Schedule customization controls
-- `SchedulePreview.tsx` - Preview of generated schedule
+- `ScheduleGeneratorPage.jsx` - Schedule creation interface
+- `TemplateSelector.jsx` - Schedule template options
+- `CustomizationPanel.jsx` - Schedule customization controls
+- `SchedulePreview.jsx` - Preview of generated schedule
 
 ### 5. Feedback System
 
@@ -214,10 +193,10 @@ The feedback system will collect user input on generated schedules.
 5. Implement feedback history view
 
 **Key Components:**
-- `FeedbackForm.tsx` - Complete feedback collection form
-- `RatingStars.tsx` - Star rating input
-- `LikertScale.tsx` - Likert scale questions
-- `FeedbackHistory.tsx` - Historical feedback view
+- `FeedbackForm.jsx` - Complete feedback collection form
+- `RatingStars.jsx` - Star rating input
+- `LikertScale.jsx` - Likert scale questions
+- `FeedbackHistory.jsx` - Historical feedback view
 
 ## Responsive Design Strategy
 
