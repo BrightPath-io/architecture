@@ -5,7 +5,7 @@ Based on stakeholder feedback, this document outlines the revised technology sta
 ## Core Technology Changes
 
 | Component | Plan  | Impact |
-|-----------|---------------|--------------|--------|
+|-----------|--------------|--------|
 | Frontend Language |  JavaScript | Simplified development without static typing |
 | UI Framework |  Radix UI | More accessible, pre-built components with consistent design |
 | Cloud Provider |  Digital Ocean | Simplified deployment and potentially lower costs |
