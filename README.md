@@ -32,6 +32,7 @@ Comprehensive documentation for the BrightPath project is available in the follo
 - [Architecture Plan](BrightPath_Architecture_Plan.md): System architecture and component design
 - [Frontend Implementation Plan](frontend_implementation_plan.md): Detailed frontend development plan
 - [Backend Implementation Plan](backend_implementation_plan.md): Detailed backend development plan
+- [Database Schema](database_schema.md): Comprehensive database diagram using DBML
 - [ML Implementation Plan](ml_implementation_plan.md): Machine learning implementation details
 - [Revised Technology Stack](revised_technology_stack.md): Updated technology choices
 - [Docker Development Environment](docker_development_environment.md): Dockerized development setup
