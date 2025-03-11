@@ -37,7 +37,6 @@ Comprehensive documentation for the BrightPath project is available in the follo
 - [Revised Technology Stack](revised_technology_stack.md): Updated technology choices
 - [Docker Development Environment](docker_development_environment.md): Dockerized development setup
 - [Terraform Infrastructure Plan](terraform_infrastructure_plan.md): Infrastructure as code for Digital Ocean
-- [Development Roadmap](development_roadmap.md): Project timeline and milestones
 - [Testing Strategy](testing_strategy.md): Comprehensive testing approach
 - [Deployment Strategy](deployment_strategy.md): Deployment and infrastructure details
 
