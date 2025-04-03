@@ -71,12 +71,12 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
 ## Frontend Implementation
 
 ### Technology Stack
-- **Framework**: React with TypeScript
+- **Framework**: React
 - **Build Tool**: Vite
 - **Routing**: React Router
 - **State Management**: React Context API + hooks (consider Redux for complex state)
-- **Styling**: CSS Modules or Tailwind CSS
-- **Component Library**: Consider Material-UI or Chakra UI
+- **Styling**: CSS Modules
+- **Component Library**: Radix
 
 ### Architecture
 The frontend will follow a modular architecture with:
