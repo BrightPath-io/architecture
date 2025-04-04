@@ -24,22 +24,23 @@ BrightPath is a homeschooling scheduling platform that leverages AI/ML to help p
 
 ## System Architecture
 
-BrightPath will follow a modern, scalable architecture with clear separation of concerns:
+BrightPath will follow a modern, scalable architecture with clear separation of concerns, using a hybrid database approach with MongoDB and Redis/Valkey:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  React Frontend │────▶│  Django API     │────▶│  Database       │
-│  (Vite)         │◀────│  (REST)         │◀────│  (PostgreSQL)   │
+│  React Frontend │────▶│  Django API     │────▶│  MongoDB        │
+│  (Vite)         │◀────│  (REST)         │◀────│  (Document DB)  │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │   ▲
-                               ▼   │
-                        ┌─────────────────┐
-                        │                 │
-                        │  ML Services    │
-                        │                 │
-                        └─────────────────┘
+                               │   ▲                   │   ▲
+                               │   │                   │   │
+                               ▼   │                   ▼   │
+                        ┌─────────────────┐     ┌─────────────────┐
+                        │                 │     │                 │
+                        │  ML Services    │─────│  Redis/Valkey   │
+                        │                 │     │  (Cache/RT)     │
+                        └─────────────────┘     └─────────────────┘
 ```
 
 ### Key Components:
@@ -52,11 +53,17 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
 2. **API Server**
    - Django + Django REST Framework
    - RESTful API endpoints
-   - Authentication and authorization
+   - Authentication and authorization with Google OAuth
 
-3. **Database**
-   - PostgreSQL for relational data
-   - JSONB fields for flexible schedule storage
+3. **Database (Hybrid Approach)**
+   - **MongoDB**: Primary database for persistent storage
+     - Document-oriented data model for flexible schema
+     - Natural fit for hierarchical data structures
+     - Efficient storage for questionnaire responses and schedule data
+   - **Redis/Valkey**: Caching and real-time functionality
+     - Session management
+     - Real-time schedule updates
+     - Caching for performance optimization
 
 4. **ML Services**
    - Schedule Generator Model
@@ -64,8 +71,8 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
    - Continuous improvement pipeline
 
 5. **Infrastructure**
-   - Containerized deployment
-   - CI/CD pipeline
+   - Containerized deployment with Docker
+   - CI/CD pipeline with GitHub Actions
    - Monitoring and logging
 
 ## Frontend Implementation
@@ -90,24 +97,27 @@ The frontend will follow a modular architecture with:
 
 ### Key Features
 1. **Onboarding Flow**
-   - Multi-step questionnaire with Likert scale questions
-   - User profile creation
-   - Child profile creation
+   - TurboTax-like multi-step questionnaire
+   - Progressive disclosure pattern
+   - Smart defaults based on child age
+   - Multi-child support
+   - Save and continue functionality
 
 2. **Schedule Dashboard**
    - Interactive schedule view
    - Drag-and-drop adjustments
    - Daily, weekly, and monthly views
+   - Activity completion tracking
 
 3. **Schedule Generation**
    - AI-powered schedule creation
-   - Template selection
-   - Customization options
+   - Preference-based customization
+   - Real-time adjustments
 
 4. **Feedback System**
-   - Star ratings
-   - Likert scale questions
-   - Natural language feedback
+   - Activity completion feedback
+   - Schedule satisfaction ratings
+   - Implicit feedback through user interactions
 
 5. **Resource Library**
    - Subject-specific resources
@@ -131,19 +141,18 @@ client/
 │   ├── services/
 │   │   ├── api/
 │   │   └── auth/
-│   ├── types/
 │   ├── utils/
 │   ├── views/
 │   │   ├── dashboard/
 │   │   ├── onboarding/
 │   │   ├── profile/
 │   │   └── schedule/
-│   ├── App.tsx
-│   └── main.tsx
+│   ├── App.jsx
+│   └── main.jsx
 ├── .eslintrc.js
 ├── package.json
 ├── tsconfig.json
-└── vite.config.ts
+└── vite.config.js
 ```
 
 ## Backend Implementation
@@ -151,38 +160,50 @@ client/
 ### Technology Stack
 - **Framework**: Django + Django REST Framework
 - **API**: RESTful endpoints
-- **Authentication**: JWT-based authentication
+- **Authentication**: Google OAuth
+- **Database**: MongoDB (primary) + Redis/Valkey (caching/real-time)
 - **ML Integration**: Python-based ML models with scikit-learn/TensorFlow
 
 ### Architecture
-The backend will follow Django's MVT architecture with:
+The backend will follow Django's architecture with adaptations for MongoDB:
 
-1. **Models**: Database schema definitions
+1. **Models**: MongoDB document schemas (using Djongo or PyMongo)
 2. **Views**: API endpoints and business logic
 3. **Serializers**: Data transformation and validation
 4. **Services**: Business logic and ML model integration
 5. **Utils**: Helper functions and utilities
+6. **Cache**: Redis/Valkey interface for caching and real-time updates
 
 ### Key Features
 1. **User Management**
-   - Registration and authentication
+   - Google OAuth integration
    - Profile management
    - Child profile management
+   - Session handling with Redis/Valkey
 
-2. **Schedule Management**
-   - Schedule generation
-   - Schedule storage and retrieval
-   - Schedule adjustments
+2. **Questionnaire System**
+   - Progressive multi-step questionnaire
+   - Draft response storage in Redis/Valkey
+   - Final response persistence in MongoDB
+   - Multi-child flow management
 
 3. **ML Integration**
-   - Schedule generator model
-   - Reward model
+   - Schedule generator model integration
+   - Reward model for feedback processing
+   - ML parameter storage in MongoDB
+   - Feature caching in Redis/Valkey
    - Continuous learning pipeline
 
-4. **Feedback System**
-   - Feedback collection
-   - Feedback analysis
-   - Model improvement
+4. **Schedule Management**
+   - ML-powered schedule generation
+   - Schedule storage in MongoDB
+   - Real-time updates with Redis/Valkey
+   - Activity completion tracking
+
+5. **Feedback System**
+   - Explicit and implicit feedback collection
+   - Feedback analysis for ML improvement
+   - Real-time schedule adjustments
 
 ### Code Organization
 ```
@@ -200,138 +221,297 @@ api/
 │   ├── schedules/
 │   ├── subjects/
 │   ├── feedback/
-│   └── surveys/
+│   └── questionnaire/
 ├── ml/
 │   ├── generator/
 │   ├── reward/
 │   └── training/
 ├── utils/
+├── cache/
+│   ├── client.py
+│   ├── session.py
+│   └── schedules.py
+├── db/
+│   ├── connection.py
+│   ├── schemas.py
+│   └── validators.py
 ├── manage.py
 └── requirements.txt
 ```
 
 ## Database Design
 
-The database will use PostgreSQL with the following schema:
+The database design will utilize a hybrid approach with MongoDB for persistent storage and Redis/Valkey for caching and real-time functionality.
 
-```
-// Users Table
-Table User {
-  id int [primary key]
-  first_name varchar
-  last_name varchar
-  email varchar [unique]
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
+### MongoDB Collections
 
-// Children Table
-Table Child {
-  id int [primary key]
-  user_id int [ref: > User.id]
-  first_name varchar
-  birth_date date
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// Subjects Table (Predefined and Custom Subjects)
-Table Subject {
-  id int [primary key]
-  name varchar
-  user_id int [ref: > User.id, null] // Null for predefined subjects
-  is_standard boolean [default: true] // True for predefined subjects
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// Schedule Table (Stores Generated Schedules in JSONB)
-Table Schedule {
-  id int [primary key]
-  user_id int [ref: > User.id]
-  child_id int [ref: > Child.id]
-  schedule_data jsonb // Stores the full schedule document
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// Feedback Table (Stores user ratings & comments on generated schedules)
-Table Feedback {
-  id int [primary key]
-  schedule_id int [ref: > Schedule.id, on delete: cascade]
-  user_id int [ref: > User.id]
-  star_rating int // 1-5 rating
-  feedback_data jsonb // Stores Likert scale & text feedback
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// Category Table (For grouping questionnaire questions)
-Table Category {
-  id int [primary key]
-  name varchar [unique]
-  description text
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// Question Table (Stores questions used in onboarding and feedback forms)
-Table Question {
-  id int [primary key]
-  category_id int [ref: > Category.id]
-  text text
-  weight int [default: 1] // For ranking importance
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// SurveySession Table (Tracks user onboarding questionnaire progress)
-Table SurveySession {
-  id int [primary key]
-  user_id int [ref: > User.id]
-  started_at timestamp [default: "CURRENT_TIMESTAMP"]
-  completed_at timestamp [null]
-  status varchar [default: "in_progress"]
-}
-
-// SurveyResponse Table (Stores user answers to onboarding questions)
-Table SurveyResponse {
-  id int [primary key]
-  session_id int [ref: > SurveySession.id, on delete: cascade]
-  question_id int [ref: > Question.id]
-  rating int // For Likert scale answers (1-5)
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
+#### 1. families Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "googleId": "google_provided_id", // For OAuth authentication
+  "email": "sarah@example.com", // From Google OAuth
+  "name": "Sarah Kim", // From questionnaire
+  "createdAt": ISODate("2025-04-01"),
+  "lastLogin": ISODate("2025-04-03"),
+  "preferences": {
+    "schedulingFlexibility": "moderate_structure",
+    "homeschoolingPhilosophy": {
+      "traditional": 2,
+      "charlotte_mason": 5,
+      "montessori": 3,
+      "classical": 1,
+      "unschooling": 4
+    },
+    "schedulingStyle": {
+      "block": 4,
+      "loop": 3,
+      "time_blocked": 2,
+      "interest_led": 5,
+      "grouped_activities": 3
+    },
+    "planningApproach": "mix_of_planned_and_spontaneous",
+    "activityPreferences": {
+      "textbooks_worksheets": 2,
+      "nature_exploration": 5,
+      "arts_crafts": 4,
+      "memorization": 2,
+      "research_projects": 3,
+      "experiments": 5,
+      "discussions": 4
+    }
+  },
+  "commitments": [
+    // Family-wide commitments
+    {
+      "name": "Work Meeting",
+      "frequency": "weekly",
+      "daysOfWeek": ["Tuesday", "Thursday"],
+      "startTime": "10:00",
+      "endTime": "11:30"
+    }
+  ]
 }
 ```
 
-### Additional Tables to Consider:
-
+#### 2. children Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "familyId": ObjectId("..."), // Reference to parent family
+  "name": "Noah",
+  "age": 6,
+  "createdAt": ISODate("2025-04-01"),
+  "commitments": [
+    // Child-specific commitments
+    {
+      "name": "Soccer Practice",
+      "frequency": "weekly",
+      "daysOfWeek": ["Monday", "Wednesday"],
+      "startTime": "16:00",
+      "endTime": "17:00"
+    }
+  ],
+  "learningPreferences": {
+    "bestLearningTimes": ["mid-morning", "early_afternoon"],
+    "homeschoolingHours": {
+      "startTime": "09:00",
+      "endTime": "14:00"
+    }
+  },
+  "subjects": [
+    {
+      "name": "Mathematics",
+      "isCoreSubject": true,
+      "sessionDuration": 30, // minutes
+      "frequency": "daily",
+      "parentInvolvement": "some_assistance",
+      "fixedTime": {
+        "required": false,
+        "preferredTime": null
+      },
+      "interestLevel": 4 // 1-5 scale
+    },
+    // Additional subjects...
+  ]
+}
 ```
-// Resources Table (Educational resources)
-Table Resource {
-  id int [primary key]
-  title varchar
-  description text
-  url varchar
-  type varchar // e.g., video, article, worksheet
-  subject_id int [ref: > Subject.id]
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
 
-// Activities Table (For tracking completed activities)
-Table Activity {
-  id int [primary key]
-  child_id int [ref: > Child.id]
-  subject_id int [ref: > Subject.id]
-  schedule_id int [ref: > Schedule.id]
-  completed_at timestamp
-  duration_minutes int
-  notes text
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
-}
-
-// UserPreferences Table (For storing user preferences)
-Table UserPreference {
-  id int [primary key]
-  user_id int [ref: > User.id]
-  preference_key varchar
-  preference_value jsonb
-  created_at timestamp [default: "CURRENT_TIMESTAMP"]
+#### 3. schedules Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "familyId": ObjectId("..."),
+  "childId": ObjectId("..."),
+  "weekStartDate": ISODate("2025-04-07"),
+  "createdAt": ISODate("2025-04-01"),
+  "updatedAt": ISODate("2025-04-01"),
+  "version": 1, // Increments with each regeneration
+  "isActive": true,
+  "generationMethod": "ml_model_v1",
+  "days": [
+    {
+      "date": ISODate("2025-04-07"),
+      "dayOfWeek": "Monday",
+      "items": [
+        {
+          "_id": ObjectId("..."),
+          "type": "subject",
+          "name": "Mathematics",
+          "originalSubject": {
+            "name": "Mathematics",
+            "isCoreSubject": true,
+            "sessionDuration": 30,
+            "parentInvolvement": "some_assistance"
+          },
+          "startTime": "09:30",
+          "endTime": "10:00",
+          "completed": false,
+          "notes": ""
+        },
+        // More scheduled items...
+      ]
+    }
+    // More days...
+  ]
 }
 ```
+
+#### 4. activity_logs Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "scheduleId": ObjectId("..."),
+  "scheduleItemId": ObjectId("..."),
+  "familyId": ObjectId("..."),
+  "childId": ObjectId("..."),
+  "date": ISODate("2025-04-07"),
+  "activityName": "Mathematics",
+  "activityType": "subject",
+  "scheduled": {
+    "startTime": "09:30",
+    "endTime": "10:00"
+  },
+  "actual": {
+    "completed": true,
+    "completedAt": ISODate("2025-04-07T10:05:00Z"), 
+    "startTime": "09:35", // Optional
+    "endTime": "10:05" // Optional
+  },
+  "notes": "Noah enjoyed the counting activities today",
+  "createdAt": ISODate("2025-04-07T10:05:00Z")
+}
+```
+
+#### 5. questionnaire_progress Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "familyId": ObjectId("..."),
+  "startedAt": ISODate("2025-04-01T09:15:00Z"),
+  "lastUpdatedAt": ISODate("2025-04-01T09:35:00Z"),
+  "currentSection": 4,
+  "progress": {
+    "section1": "complete",
+    "section2": "complete",
+    "section3": "complete",
+    "section4": "in_progress",
+    "section5": "not_started",
+    "section6": "not_started",
+    "section7": "not_started"
+  },
+  "childrenProgress": [
+    {
+      "childId": ObjectId("..."),
+      "section3Child": "complete",
+      "section4": "in_progress", 
+      "section6": "not_started"
+    }
+  ],
+  "draftResponses": {
+    // Temporary draft responses
+  }
+}
+```
+
+#### 6. ml_models Collection
+```javascript
+{
+  "_id": ObjectId("..."),
+  "name": "schedule_generator_v1",
+  "version": "1.0.0",
+  "createdAt": ISODate("2025-03-15"),
+  "parameters": {
+    // Model-specific parameters
+  },
+  "featureImportance": {
+    // Information about which features most impact schedule generation
+  },
+  "performance": {
+    "averageSatisfactionScore": 4.2,
+    "usageCount": 1245
+  }
+}
+```
+
+### Redis/Valkey Key Patterns
+
+#### 1. Session Management
+```
+// Session data with 24-hour expiry
+SESSION:{user_id} -> { session data as JSON }
+TTL: 86400 (24 hours)
+
+// Authentication refresh tokens
+AUTH:REFRESH:{user_id} -> "refresh_token_value"
+TTL: 2592000 (30 days)
+```
+
+#### 2. Questionnaire Progress Caching
+```
+// Detailed questionnaire progress
+QUESTIONNAIRE:PROGRESS:{family_id} -> { progress data as JSON }
+TTL: 3600 (1 hour)
+
+// Temporary form data
+QUESTIONNAIRE:DRAFT:{family_id}:{section_id} -> { draft responses as JSON }
+TTL: 86400 (24 hours)
+```
+
+#### 3. Schedule Caching
+```
+// Today's schedule for quick access
+SCHEDULE:TODAY:{child_id} -> { today's schedule as JSON }
+TTL: 86400 (24 hours)
+
+// Current week's schedule
+SCHEDULE:WEEK:{child_id} -> { week's schedule as JSON }
+TTL: 604800 (7 days)
+```
+
+#### 4. Real-time Activity Status
+```
+// Current status of schedule items
+SCHEDULE:ITEM:STATUS:{schedule_item_id} -> { status data as JSON }
+TTL: 86400 (24 hours)
+
+// Schedule modifications in progress
+SCHEDULE:EDIT:{schedule_id} -> { modification data as JSON }
+TTL: 1800 (30 minutes)
+```
+
+### Indexing Strategy
+For MongoDB collections:
+- `families`: `googleId` (unique), `email` (unique)
+- `children`: `familyId`
+- `schedules`: `familyId`, `childId`, `weekStartDate`
+- `activity_logs`: `familyId`, `childId`, `date`
+
+### Data Flow Between MongoDB and Redis/Valkey
+1. Write-through cache pattern for critical data
+2. Cache invalidation when MongoDB data is updated
+3. Fallback to MongoDB when Redis/Valkey data is unavailable
+4. Appropriate TTL values based on data volatility
 
 ## Machine Learning Implementation
 
@@ -348,7 +528,7 @@ BrightPath will implement two key ML models:
   - Child age and characteristics
   - Subject preferences
   - Time constraints
-- **Output**: Schedule configuration (JSON structure)
+- **Output**: Schedule configuration (MongoDB document structure)
 - **Training**: Initially trained on synthetic data, then refined with real user data
 
 **Development Steps**:
@@ -365,7 +545,7 @@ BrightPath will implement two key ML models:
 - **Model Type**: Regression model for satisfaction prediction
 - **Features**:
   - Schedule characteristics
-  - User feedback (star ratings, Likert responses)
+  - User feedback (explicit and implicit)
   - Schedule adjustments made by users
 - **Output**: Satisfaction score (0-1)
 - **Training**: Trained on user feedback data
@@ -415,26 +595,32 @@ ml/
     └── validation.py
 ```
 
+### ML Model Integration with Database
+- Store model parameters in MongoDB for persistence
+- Cache frequently used parameters in Redis/Valkey for performance
+- Use MongoDB for storing training data and evaluation metrics
+- Use Redis/Valkey for real-time feature extraction and inference
+
 ## Development Roadmap
 
 ### Phase 1: Foundation (Months 1-2)
 - Set up project infrastructure
-- Implement basic frontend and backend
-- Create database schema
-- Develop user authentication
-- Build initial onboarding flow
+- Implement MongoDB and Redis/Valkey setup
+- Create database schemas and indexes
+- Implement Google OAuth authentication
+- Build initial questionnaire flow
 
 ### Phase 2: Core Functionality (Months 3-4)
-- Implement schedule generation (rule-based initially)
-- Create schedule visualization and management
-- Build feedback collection system
-- Develop subject and resource management
-- Implement basic reporting
+- Implement questionnaire with save/continue functionality
+- Create schedule generation (rule-based initially)
+- Build schedule visualization and management
+- Develop activity tracking and completion system
+- Implement cache synchronization between MongoDB and Redis/Valkey
 
 ### Phase 3: ML Integration (Months 5-6)
 - Develop initial ML models
 - Integrate ML models with schedule generation
-- Implement feedback loop
+- Implement feedback collection and processing
 - Create A/B testing framework
 - Refine user experience based on initial feedback
 
@@ -442,7 +628,7 @@ ml/
 - Implement advanced schedule features
 - Enhance ML models with more data
 - Add resource recommendations
-- Improve performance and scalability
+- Optimize database queries and caching strategy
 - Conduct user testing and refinement
 
 ### Phase 5: Launch Preparation (Months 9-10)
@@ -463,8 +649,14 @@ ml/
 ### Backend Testing
 - **Unit Tests**: Django test framework for models and services
 - **API Tests**: DRF test framework for API endpoints
-- **Integration Tests**: Test database interactions and service integrations
+- **Database Tests**: Test MongoDB and Redis/Valkey interactions
 - **Performance Tests**: Load testing with Locust
+
+### Database Testing
+- **Schema Validation**: Test MongoDB validation rules
+- **Indexing Performance**: Validate query performance
+- **Cache Strategy**: Test cache hit/miss rates
+- **Consistency Tests**: Ensure data consistency between MongoDB and Redis/Valkey
 
 ### ML Testing
 - **Model Validation**: Cross-validation and holdout testing
@@ -476,8 +668,8 @@ ml/
 
 ### Infrastructure
 - **Containerization**: Docker for consistent environments
-- **Orchestration**: Docker Compose for container management
-- **CI/CD**: GitHub Actions or GitLab CI for automated pipelines
+- **Orchestration**: Docker Compose for development, Kubernetes for production
+- **CI/CD**: GitHub Actions for automated pipelines
 - **Monitoring**: Prometheus + Grafana for metrics and alerting
 - **Logging**: Structured logging with ELK stack for centralized logging
 
@@ -487,19 +679,18 @@ ml/
 - **Staging**: Pre-production environment for final testing
 - **Production**: Live environment for end users
 
-### Deployment Process
-1. Code is pushed to repository
-2. CI/CD pipeline runs tests and builds artifacts
-3. Artifacts are deployed to appropriate environment
-4. Smoke tests verify deployment
-5. Monitoring confirms system health
+### Database Deployment
+- **MongoDB**: MongoDB Atlas for managed service
+- **Redis/Valkey**: Digital Ocean Managed Redis service
+- **Backup Strategy**: Automated daily backups for MongoDB
+- **Scaling Strategy**: Horizontal scaling for both database systems
 
 ### Digital Ocean Infrastructure
 - **Web Servers**: Digital Ocean Droplets for hosting the Django application
 - **Load Balancer**: Digital Ocean Load Balancer for distributing traffic
-- **Database**: Digital Ocean Managed Database for PostgreSQL
+- **Databases**: MongoDB Atlas and DO Managed Redis
 - **Object Storage**: Digital Ocean Spaces for static files and user uploads
-- **Monitoring**: Digital Ocean Monitoring for infrastructure metrics
+- **Monitoring**: Digital Ocean Monitoring integrated with Prometheus/Grafana
 
 ## COPPA Compliance
 
