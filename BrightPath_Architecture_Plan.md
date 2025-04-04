@@ -1,5 +1,5 @@
 # BrightPath: Homeschooling Scheduling Platform
-## Architecture and Implementation Plan
+## Updated Architecture and Implementation Plan
 
 ## Table of Contents
 1. [System Overview](#system-overview)
@@ -24,7 +24,7 @@ BrightPath is a homeschooling scheduling platform that leverages AI/ML to help p
 
 ## System Architecture
 
-BrightPath will follow a modern, scalable architecture with clear separation of concerns, using a hybrid database approach with MongoDB and Redis/Valkey:
+BrightPath will follow a modern, scalable architecture with clear separation of concerns, using MongoDB for persistent storage and browser local storage for questionnaire progress in the initial prototype:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -33,14 +33,14 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
 │  (Vite)         │◀────│  (REST)         │◀────│  (Document DB)  │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │   ▲                   │   ▲
-                               │   │                   │   │
-                               ▼   │                   ▼   │
-                        ┌─────────────────┐     ┌─────────────────┐
-                        │                 │     │                 │
-                        │  ML Services    │─────│  Redis/Valkey   │
-                        │                 │     │  (Cache/RT)     │
-                        └─────────────────┘     └─────────────────┘
+        │                        │                     │   
+        │                        │                     │   
+        ▼                        ▼                     ▼   
+┌─────────────────┐     ┌─────────────────┐     
+│                 │     │                 │     
+│  Local Storage  │     │  ML Services    │     
+│  (Questionnaire)│     │                 │     
+└─────────────────┘     └─────────────────┘     
 ```
 
 ### Key Components:
@@ -49,21 +49,22 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
    - React-based SPA using Vite for fast development
    - Responsive design for all devices
    - Code splitting for performance optimization
+   - Local storage integration for questionnaire progress
 
 2. **API Server**
    - Django + Django REST Framework
    - RESTful API endpoints
    - Authentication and authorization with Google OAuth
 
-3. **Database (Hybrid Approach)**
+3. **Database Strategy**
    - **MongoDB**: Primary database for persistent storage
      - Document-oriented data model for flexible schema
      - Natural fit for hierarchical data structures
-     - Efficient storage for questionnaire responses and schedule data
-   - **Redis/Valkey**: Caching and real-time functionality
-     - Session management
-     - Real-time schedule updates
-     - Caching for performance optimization
+     - Efficient storage for final questionnaire responses and schedule data
+   - **Browser Local Storage**: For questionnaire progress in initial prototype
+     - Save and continue functionality across sessions
+     - Draft questionnaire responses storage
+     - Progress tracking without additional infrastructure
 
 4. **ML Services**
    - Schedule Generator Model
@@ -84,6 +85,7 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
 - **State Management**: React Context API + hooks (consider Redux for complex state)
 - **Styling**: CSS Modules
 - **Component Library**: Radix
+- **Local Storage**: Browser's built-in localStorage API
 
 ### Architecture
 The frontend will follow a modular architecture with:
@@ -94,6 +96,7 @@ The frontend will follow a modular architecture with:
 4. **Hooks**: Custom React hooks for shared logic
 5. **Services**: API client and other service abstractions
 6. **Utils**: Helper functions and utilities
+7. **Storage**: Local storage service for managing questionnaire progress
 
 ### Key Features
 1. **Onboarding Flow**
@@ -101,7 +104,8 @@ The frontend will follow a modular architecture with:
    - Progressive disclosure pattern
    - Smart defaults based on child age
    - Multi-child support
-   - Save and continue functionality
+   - Save and continue functionality using local storage
+   - Automatic syncing of completed questionnaire data to backend
 
 2. **Schedule Dashboard**
    - Interactive schedule view
@@ -136,11 +140,16 @@ client/
 │   │   ├── onboarding/
 │   │   └── schedule/
 │   ├── hooks/
+│   │   ├── useLocalStorage.js
+│   │   └── ...
 │   ├── layouts/
 │   ├── routes/
 │   ├── services/
 │   │   ├── api/
-│   │   └── auth/
+│   │   ├── auth/
+│   │   └── storage/
+│   │       ├── questionnaireStorage.js
+│   │       └── ...
 │   ├── utils/
 │   ├── views/
 │   │   ├── dashboard/
@@ -155,13 +164,63 @@ client/
 └── vite.config.js
 ```
 
+### Local Storage Implementation
+```javascript
+// src/services/storage/questionnaireStorage.js
+
+// Save questionnaire progress to local storage
+export const saveQuestionnaireProgress = (familyId, progressData) => {
+  const key = `questionnaire_progress_${familyId}`;
+  const data = JSON.stringify({
+    ...progressData,
+    lastUpdated: new Date().toISOString()
+  });
+  localStorage.setItem(key, data);
+};
+
+// Retrieve questionnaire progress from local storage
+export const getQuestionnaireProgress = (familyId) => {
+  const key = `questionnaire_progress_${familyId}`;
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : null;
+};
+
+// Save draft responses for a specific section
+export const saveDraftResponses = (familyId, sectionId, responses) => {
+  const key = `questionnaire_draft_${familyId}_${sectionId}`;
+  localStorage.setItem(key, JSON.stringify(responses));
+};
+
+// Get draft responses for a section
+export const getDraftResponses = (familyId, sectionId) => {
+  const key = `questionnaire_draft_${familyId}_${sectionId}`;
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : null;
+};
+
+// Clear questionnaire data when complete
+export const clearQuestionnaireData = (familyId) => {
+  // Get all keys in localStorage
+  const keys = Object.keys(localStorage);
+  
+  // Filter keys related to this family's questionnaire
+  const familyKeys = keys.filter(key => 
+    key.startsWith(`questionnaire_progress_${familyId}`) || 
+    key.startsWith(`questionnaire_draft_${familyId}_`)
+  );
+  
+  // Remove each key
+  familyKeys.forEach(key => localStorage.removeItem(key));
+};
+```
+
 ## Backend Implementation
 
 ### Technology Stack
 - **Framework**: Django + Django REST Framework
 - **API**: RESTful endpoints
 - **Authentication**: Google OAuth
-- **Database**: MongoDB (primary) + Redis/Valkey (caching/real-time)
+- **Database**: MongoDB (primary)
 - **ML Integration**: Python-based ML models with scikit-learn/TensorFlow
 
 ### Architecture
@@ -172,38 +231,35 @@ The backend will follow Django's architecture with adaptations for MongoDB:
 3. **Serializers**: Data transformation and validation
 4. **Services**: Business logic and ML model integration
 5. **Utils**: Helper functions and utilities
-6. **Cache**: Redis/Valkey interface for caching and real-time updates
 
 ### Key Features
 1. **User Management**
    - Google OAuth integration
    - Profile management
    - Child profile management
-   - Session handling with Redis/Valkey
+   - Session handling
 
 2. **Questionnaire System**
-   - Progressive multi-step questionnaire
-   - Draft response storage in Redis/Valkey
-   - Final response persistence in MongoDB
+   - Endpoints to receive final questionnaire responses
+   - MongoDB persistence for completed questionnaires
    - Multi-child flow management
+   - No server-side progress tracking in the initial prototype
 
 3. **ML Integration**
    - Schedule generator model integration
    - Reward model for feedback processing
    - ML parameter storage in MongoDB
-   - Feature caching in Redis/Valkey
    - Continuous learning pipeline
 
 4. **Schedule Management**
    - ML-powered schedule generation
    - Schedule storage in MongoDB
-   - Real-time updates with Redis/Valkey
    - Activity completion tracking
 
 5. **Feedback System**
    - Explicit and implicit feedback collection
    - Feedback analysis for ML improvement
-   - Real-time schedule adjustments
+   - Schedule adjustments
 
 ### Code Organization
 ```
@@ -227,10 +283,6 @@ api/
 │   ├── reward/
 │   └── training/
 ├── utils/
-├── cache/
-│   ├── client.py
-│   ├── session.py
-│   └── schedules.py
 ├── db/
 │   ├── connection.py
 │   ├── schemas.py
@@ -241,7 +293,7 @@ api/
 
 ## Database Design
 
-The database design will utilize a hybrid approach with MongoDB for persistent storage and Redis/Valkey for caching and real-time functionality.
+The database design will utilize MongoDB for persistent storage, with browser local storage for questionnaire progress in the initial prototype.
 
 ### MongoDB Collections
 
@@ -290,7 +342,9 @@ The database design will utilize a hybrid approach with MongoDB for persistent s
       "startTime": "10:00",
       "endTime": "11:30"
     }
-  ]
+  ],
+  "questionnaireCompleted": true,
+  "questionnaireCompletedAt": ISODate("2025-04-01T10:30:00Z")
 }
 ```
 
@@ -403,38 +457,7 @@ The database design will utilize a hybrid approach with MongoDB for persistent s
 }
 ```
 
-#### 5. questionnaire_progress Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "familyId": ObjectId("..."),
-  "startedAt": ISODate("2025-04-01T09:15:00Z"),
-  "lastUpdatedAt": ISODate("2025-04-01T09:35:00Z"),
-  "currentSection": 4,
-  "progress": {
-    "section1": "complete",
-    "section2": "complete",
-    "section3": "complete",
-    "section4": "in_progress",
-    "section5": "not_started",
-    "section6": "not_started",
-    "section7": "not_started"
-  },
-  "childrenProgress": [
-    {
-      "childId": ObjectId("..."),
-      "section3Child": "complete",
-      "section4": "in_progress", 
-      "section6": "not_started"
-    }
-  ],
-  "draftResponses": {
-    // Temporary draft responses
-  }
-}
-```
-
-#### 6. ml_models Collection
+#### 5. ml_models Collection
 ```javascript
 {
   "_id": ObjectId("..."),
@@ -454,64 +477,96 @@ The database design will utilize a hybrid approach with MongoDB for persistent s
 }
 ```
 
-### Redis/Valkey Key Patterns
+### Local Storage Schema
 
-#### 1. Session Management
+For the initial prototype, the browser's localStorage will be used to store questionnaire progress and draft responses. The following key patterns will be used:
+
 ```
-// Session data with 24-hour expiry
-SESSION:{user_id} -> { session data as JSON }
-TTL: 86400 (24 hours)
+// Overall questionnaire progress
+questionnaire_progress_{familyId} -> {
+  "currentSection": 4,
+  "currentChild": "child_id_1",
+  "lastUpdated": "2025-04-03T15:30:00Z",
+  "sectionsCompleted": ["section1", "section2", "section3"],
+  "childSpecificProgress": {
+    "child_id_1": {
+      "section3Child": "complete",
+      "section4": "in_progress"
+    }
+  }
+}
 
-// Authentication refresh tokens
-AUTH:REFRESH:{user_id} -> "refresh_token_value"
-TTL: 2592000 (30 days)
-```
+// Draft responses for each section
+questionnaire_draft_{familyId}_{sectionId} -> {
+  // Draft responses for current section
+}
 
-#### 2. Questionnaire Progress Caching
-```
-// Detailed questionnaire progress
-QUESTIONNAIRE:PROGRESS:{family_id} -> { progress data as JSON }
-TTL: 3600 (1 hour)
-
-// Temporary form data
-QUESTIONNAIRE:DRAFT:{family_id}:{section_id} -> { draft responses as JSON }
-TTL: 86400 (24 hours)
-```
-
-#### 3. Schedule Caching
-```
-// Today's schedule for quick access
-SCHEDULE:TODAY:{child_id} -> { today's schedule as JSON }
-TTL: 86400 (24 hours)
-
-// Current week's schedule
-SCHEDULE:WEEK:{child_id} -> { week's schedule as JSON }
-TTL: 604800 (7 days)
+// Child-specific draft responses
+questionnaire_draft_{familyId}_{childId}_{sectionId} -> {
+  // Child-specific draft responses
+}
 ```
 
-#### 4. Real-time Activity Status
-```
-// Current status of schedule items
-SCHEDULE:ITEM:STATUS:{schedule_item_id} -> { status data as JSON }
-TTL: 86400 (24 hours)
+### Implementation Considerations
 
-// Schedule modifications in progress
-SCHEDULE:EDIT:{schedule_id} -> { modification data as JSON }
-TTL: 1800 (30 minutes)
-```
+#### 1. Indexing Strategy for MongoDB
 
-### Indexing Strategy
-For MongoDB collections:
-- `families`: `googleId` (unique), `email` (unique)
-- `children`: `familyId`
-- `schedules`: `familyId`, `childId`, `weekStartDate`
-- `activity_logs`: `familyId`, `childId`, `date`
+- `families`:
+  - `googleId` (unique)
+  - `email` (unique)
 
-### Data Flow Between MongoDB and Redis/Valkey
-1. Write-through cache pattern for critical data
-2. Cache invalidation when MongoDB data is updated
-3. Fallback to MongoDB when Redis/Valkey data is unavailable
-4. Appropriate TTL values based on data volatility
+- `children`:
+  - `familyId`
+  - `name` (for search functionality)
+
+- `schedules`:
+  - `familyId`
+  - `childId`
+  - `weekStartDate`
+  - Compound index: `{childId: 1, weekStartDate: 1}`
+
+- `activity_logs`:
+  - `scheduleId`
+  - `scheduleItemId`
+  - `date`
+  - Compound index: `{childId: 1, date: 1}`
+
+#### 2. Local Storage Limitations and Solutions
+
+- **Storage Limit**: Most browsers limit localStorage to 5-10MB per domain. Solutions:
+  - Minimal data storage (only essential responses and state)
+  - Data compression for larger responses
+  - Periodic cleanup of unnecessary data
+
+- **Data Loss Risks**: localStorage can be cleared by users. Solutions:
+  - Regular reminders to complete the questionnaire
+  - Automatic syncing of completed sections to MongoDB when possible
+  - Clear instructions to not clear browser data during questionnaire
+
+- **Security Considerations**: localStorage is not secure for sensitive data. Solutions:
+  - Store only non-sensitive information locally
+  - Final submission of data occurs through secure API connection to backend
+  - Encrypt any potentially sensitive information with a session key
+
+- **Cross-Device Limitations**: localStorage is device-specific. Solutions:
+  - Clearly communicate that questionnaire progress is tied to current device
+  - Offer to email a resumption link for later continuation
+  - In future iterations, migrate to server-based progress tracking with Redis/Valkey
+
+#### 3. Migration Path to Server-Side Storage
+
+As part of the future enhancements, a clear migration path should be established for moving from local storage to Redis/Valkey for questionnaire progress:
+
+1. **Data Migration**:
+   - Add backend endpoints for saving and retrieving questionnaire progress
+   - Implement dual-write approach during transition phase
+   - Gradually migrate to server-side storage while maintaining backward compatibility
+
+2. **Feature Enhancements**:
+   - Multi-device continuation
+   - Real-time progress tracking
+   - Advanced analytics on questionnaire completion rates
+   - Better handling of multi-user scenarios
 
 ## Machine Learning Implementation
 
@@ -597,25 +652,24 @@ ml/
 
 ### ML Model Integration with Database
 - Store model parameters in MongoDB for persistence
-- Cache frequently used parameters in Redis/Valkey for performance
 - Use MongoDB for storing training data and evaluation metrics
-- Use Redis/Valkey for real-time feature extraction and inference
 
 ## Development Roadmap
 
 ### Phase 1: Foundation (Months 1-2)
 - Set up project infrastructure
-- Implement MongoDB and Redis/Valkey setup
+- Implement MongoDB setup
 - Create database schemas and indexes
 - Implement Google OAuth authentication
-- Build initial questionnaire flow
+- Build local storage service for questionnaire progress
+- Create initial questionnaire UI components
 
 ### Phase 2: Core Functionality (Months 3-4)
-- Implement questionnaire with save/continue functionality
+- Implement questionnaire with local storage save/continue functionality
 - Create schedule generation (rule-based initially)
 - Build schedule visualization and management
 - Develop activity tracking and completion system
-- Implement cache synchronization between MongoDB and Redis/Valkey
+- Build final questionnaire submission process
 
 ### Phase 3: ML Integration (Months 5-6)
 - Develop initial ML models
@@ -628,7 +682,7 @@ ml/
 - Implement advanced schedule features
 - Enhance ML models with more data
 - Add resource recommendations
-- Optimize database queries and caching strategy
+- Optimize database queries
 - Conduct user testing and refinement
 
 ### Phase 5: Launch Preparation (Months 9-10)
@@ -645,18 +699,17 @@ ml/
 - **Integration Tests**: React Testing Library for component integration
 - **E2E Tests**: Cypress for end-to-end testing
 - **Visual Regression**: Storybook + Chromatic
+- **Local Storage Tests**: Specific tests for localStorage interactions
 
 ### Backend Testing
 - **Unit Tests**: Django test framework for models and services
 - **API Tests**: DRF test framework for API endpoints
-- **Database Tests**: Test MongoDB and Redis/Valkey interactions
+- **Database Tests**: Test MongoDB interactions
 - **Performance Tests**: Load testing with Locust
 
 ### Database Testing
 - **Schema Validation**: Test MongoDB validation rules
 - **Indexing Performance**: Validate query performance
-- **Cache Strategy**: Test cache hit/miss rates
-- **Consistency Tests**: Ensure data consistency between MongoDB and Redis/Valkey
 
 ### ML Testing
 - **Model Validation**: Cross-validation and holdout testing
@@ -681,14 +734,13 @@ ml/
 
 ### Database Deployment
 - **MongoDB**: MongoDB Atlas for managed service
-- **Redis/Valkey**: Digital Ocean Managed Redis service
 - **Backup Strategy**: Automated daily backups for MongoDB
-- **Scaling Strategy**: Horizontal scaling for both database systems
+- **Scaling Strategy**: Horizontal scaling for MongoDB
 
 ### Digital Ocean Infrastructure
 - **Web Servers**: Digital Ocean Droplets for hosting the Django application
 - **Load Balancer**: Digital Ocean Load Balancer for distributing traffic
-- **Databases**: MongoDB Atlas and DO Managed Redis
+- **Databases**: MongoDB Atlas
 - **Object Storage**: Digital Ocean Spaces for static files and user uploads
 - **Monitoring**: Digital Ocean Monitoring integrated with Prometheus/Grafana
 
@@ -719,6 +771,13 @@ To ensure compliance with the Children's Online Privacy Protection Act (COPPA):
 5. Establish regular compliance reviews
 
 ## Future Enhancements
+
+### Enhanced Session Management
+- **Redis/Valkey Integration**: Migrate from local storage to Redis/Valkey
+- **Multi-device Support**: Enable questionnaire continuation across devices
+- **Real-time Synchronization**: Real-time progress updates
+- **Analytics**: Advanced questionnaire completion analytics
+- **Enhanced Security**: Better protection for in-progress data
 
 ### Generative AI Integration
 - **Personalized Learning Paths**: AI-generated curriculum recommendations

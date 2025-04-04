@@ -1,6 +1,6 @@
-# BrightPath Database Design: MongoDB and Redis/Valkey Hybrid Approach
+# BrightPath Database Design: MongoDB with Local Storage for Questionnaire Progress
 
-This document outlines the database design for the BrightPath homeschooling scheduling platform, using a hybrid approach with MongoDB for persistent storage and Redis/Valkey for caching and real-time functionality.
+This document outlines the revised database design for the BrightPath homeschooling scheduling platform, using MongoDB for persistent storage and browser local storage for questionnaire progress in the initial prototype.
 
 ## MongoDB Schema Design
 
@@ -55,7 +55,9 @@ MongoDB serves as the primary data store for all persistent application data.
       "startTime": "10:00",
       "endTime": "11:30"
     }
-  ]
+  ],
+  "questionnaireCompleted": true,
+  "questionnaireCompletedAt": ISODate("2025-04-01T10:30:00Z")
 }
 ```
 
@@ -192,40 +194,7 @@ MongoDB serves as the primary data store for all persistent application data.
 }
 ```
 
-### 5. questionnaire_progress Collection
-
-```javascript
-{
-  "_id": ObjectId("..."),
-  "familyId": ObjectId("..."),
-  "startedAt": ISODate("2025-04-01T09:15:00Z"),
-  "lastUpdatedAt": ISODate("2025-04-01T09:35:00Z"),
-  "currentSection": 4,
-  "progress": {
-    "section1": "complete",
-    "section2": "complete",
-    "section3": "complete",
-    "section4": "in_progress",
-    "section5": "not_started",
-    "section6": "not_started",
-    "section7": "not_started"
-  },
-  "childrenProgress": [
-    {
-      "childId": ObjectId("..."),
-      "section3Child": "complete",
-      "section4": "in_progress", 
-      "section6": "not_started"
-    }
-  ],
-  "draftResponses": {
-    // Store in-progress responses that haven't been committed
-    // This allows for save & continue functionality
-  }
-}
-```
-
-### 6. ml_models Collection
+### 5. ml_models Collection
 
 ```javascript
 {
@@ -246,246 +215,59 @@ MongoDB serves as the primary data store for all persistent application data.
 }
 ```
 
-## Redis/Valkey Schema Design
+## Local Storage Schema for Questionnaire Progress
 
-Redis/Valkey is used for caching, session management, and real-time functionality.
+For the initial prototype, the browser's localStorage will be used to store questionnaire progress and draft responses. This approach simplifies the initial implementation while providing a seamless user experience.
 
-### 1. Session Management
-
-```
-// Session data with 24-hour expiry
-SESSION:{user_id} -> {
-  "userId": "123",
-  "name": "Sarah Kim",
-  "email": "sarah@example.com",
-  "lastActivity": "2025-04-03T14:30:00Z"
-}
-TTL: 86400 (24 hours)
-
-// Authentication refresh tokens
-AUTH:REFRESH:{user_id} -> "refresh_token_value"
-TTL: 2592000 (30 days)
-```
-
-### 2. Questionnaire Progress Caching
+### Key Patterns
 
 ```
-// Detailed questionnaire progress with short TTL
-QUESTIONNAIRE:PROGRESS:{family_id} -> {
+// Overall questionnaire progress
+questionnaire_progress_{familyId} -> {
   "currentSection": 4,
-  "currentChild": "child_id_1",
-  "lastUpdated": "2025-04-03T15:30:00Z",
-  "sectionsCompleted": ["section1", "section2", "section3"],
-  "childSpecificProgress": {
-    "child_id_1": {
+  "progress": {
+    "section1": "complete",
+    "section2": "complete",
+    "section3": "complete",
+    "section4": "in_progress",
+    "section5": "not_started",
+    "section6": "not_started",
+    "section7": "not_started"
+  },
+  "childrenProgress": [
+    {
+      "childId": "temp_child_1", // Temporary ID until saved to backend
+      "name": "Noah",
       "section3Child": "complete",
-      "section4": "in_progress"
-    }
-  }
-}
-TTL: 3600 (1 hour, then fall back to MongoDB)
-
-// Temporary form data with longer TTL
-QUESTIONNAIRE:DRAFT:{family_id}:{section_id} -> {
-  // Draft responses for current section
-}
-TTL: 86400 (24 hours)
-```
-
-### 3. Schedule Caching
-
-```
-// Today's schedule for quick access
-SCHEDULE:TODAY:{child_id} -> {
-  "date": "2025-04-03",
-  "items": [
-    {
-      "id": "item_id_1",
-      "name": "Mathematics",
-      "startTime": "09:30",
-      "endTime": "10:00",
-      "completed": false
-    },
-    // More items...
-  ]
-}
-TTL: 86400 (24 hours)
-
-// Current week's schedule
-SCHEDULE:WEEK:{child_id} -> {
-  "weekOf": "2025-04-03",
-  "days": [
-    // Daily schedules
-  ]
-}
-TTL: 604800 (7 days)
-```
-
-### 4. Real-time Activity Status
-
-```
-// Current status of schedule items (for real-time updates)
-SCHEDULE:ITEM:STATUS:{schedule_item_id} -> {
-  "completed": true,
-  "completedAt": "2025-04-03T10:05:00Z",
-  "notes": "Great progress today"
-}
-TTL: 86400 (24 hours)
-
-// Schedule modifications in progress (for drag & drop)
-SCHEDULE:EDIT:{schedule_id} -> {
-  "itemsMoved": [
-    {
-      "itemId": "item_id_1",
-      "oldStartTime": "09:30",
-      "newStartTime": "10:30"
+      "section4": "in_progress", 
+      "section6": "not_started"
     }
   ],
-  "lastModified": "2025-04-03T14:22:00Z"
+  "lastUpdated": "2025-04-01T09:35:00Z"
 }
-TTL: 1800 (30 minutes)
-```
 
-### 5. ML Model Caching
-
-```
-// Cached ML model parameters for quick schedule generation
-ML:PARAMS:{model_id} -> {
-  // Model parameters
+// Draft responses for each section
+questionnaire_draft_{familyId}_section1 -> {
+  "name": "Sarah Kim"
 }
-TTL: 86400 (24 hours)
 
-// Family-specific ML features
-ML:FEATURES:{family_id} -> {
-  // Extracted features from family preferences
+// Child-specific draft responses
+questionnaire_draft_{familyId}_child_temp_child_1_section4 -> {
+  "subjects": [
+    {
+      "name": "Mathematics",
+      "isCoreSubject": true,
+      "sessionDuration": 30, 
+      // ...other subject details
+    }
+    // ...more subjects
+  ]
 }
-TTL: 86400 (24 hours)
 ```
-
-### 6. Real-time Metrics
-
-```
-// User activity metrics for monitoring
-METRICS:USER_ACTIVITY:{date} -> {
-  "activeUsers": 187,
-  "completedActivities": 2145,
-  "generatedSchedules": 42
-}
-TTL: 604800 (7 days)
-
-// Per-user activity counters
-METRICS:USER:{user_id}:{date} -> {
-  "logins": 3,
-  "completedActivities": 12,
-  "scheduleEdits": 4
-}
-TTL: 604800 (7 days)
-```
-
-## Data Flow Between MongoDB and Redis/Valkey
-
-This section explains how data flows between the two database systems for different application processes.
-
-### User Authentication Flow
-
-1. User authenticates via Google OAuth
-2. Backend validates OAuth token and retrieves user information
-3. System checks if user exists in MongoDB:
-   - If user exists: Update last login timestamp
-   - If user is new: Create new family document in MongoDB
-4. Create session in Redis/Valkey with user information
-5. Return session token to client
-6. For subsequent requests:
-   - Validate session token from Redis/Valkey
-   - If session is valid, proceed with request
-   - If session is invalid or expired, require re-authentication
-
-### Questionnaire Flow
-
-1. User begins questionnaire:
-   - Create questionnaire_progress document in MongoDB
-   - Cache progress in Redis/Valkey for fast access
-   
-2. User completes sections:
-   - Store draft responses in Redis/Valkey during data entry
-   - On section completion, write finalized section data to MongoDB
-   - Update progress in both MongoDB and Redis/Valkey
-   
-3. Child-specific sections:
-   - For each child, store related data in children collection
-   - Update child-specific progress in questionnaire_progress
-   
-4. Handling interruptions:
-   - If user leaves mid-questionnaire, data is preserved in Redis/Valkey
-   - On return, restore progress from Redis/Valkey if available
-   - If Redis/Valkey data expired, fall back to MongoDB progress data
-   
-5. Questionnaire completion:
-   - All data is committed to MongoDB (families, children, etc.)
-   - Progress document is marked complete
-   - Trigger schedule generation process
-
-### Schedule Generation Flow
-
-1. Initial data gathering:
-   - Load family preferences from MongoDB
-   - Load child information and subjects from MongoDB
-   - Extract features for ML model
-   
-2. ML model processing:
-   - Cache extracted features in Redis/Valkey for performance
-   - Load ML model parameters (from Redis/Valkey if cached, otherwise MongoDB)
-   - Generate schedule based on features and parameters
-   
-3. Schedule storage:
-   - Store generated schedule in MongoDB schedules collection
-   - Cache current day/week schedule in Redis/Valkey for quick access
-   
-4. Notification:
-   - Notify user of new schedule (through application channels)
-
-### Schedule Interaction Flow
-
-1. Schedule viewing:
-   - Check Redis/Valkey first for cached schedule
-   - If not in cache, load from MongoDB and cache results
-   - Return schedule data to client
-   
-2. Completing activities:
-   - Update status in Redis/Valkey immediately for real-time feedback
-   - Create activity_log entry in MongoDB
-   - Update schedule item completion status in MongoDB
-   - Refresh Redis/Valkey cache with updated data
-   
-3. Schedule modifications (drag & drop):
-   - Store temporary changes in Redis/Valkey during interaction
-   - When changes are confirmed, update MongoDB schedule document
-   - Update caches in Redis/Valkey with the new schedule
-   - Log schedule modification for ML feedback
-
-4. Adding notes:
-   - Store notes temporarily in Redis/Valkey
-   - Commit to MongoDB in activity_logs collection
-   - Update cache with note information
-
-### ML Feedback Loop
-
-1. Data collection:
-   - Gather completion data and modifications from MongoDB
-   - Collect user satisfaction metrics
-   
-2. Feature extraction:
-   - Process raw data into ML features
-   - Store processed features temporarily in Redis/Valkey
-   
-3. Model improvement:
-   - Update ML model parameters based on feedback
-   - Store updated parameters in MongoDB
-   - Cache new parameters in Redis/Valkey
 
 ## Implementation Considerations
 
-### 1. Indexing Strategy
+### 1. MongoDB Indexing Strategy
 
 For MongoDB collections:
 
@@ -509,52 +291,459 @@ For MongoDB collections:
   - `date`
   - Compound index: `{childId: 1, date: 1}`
 
-- `questionnaire_progress`:
-  - `familyId` (unique)
+### 2. Local Storage Considerations
 
-### 2. Data Consistency Strategy
+#### Benefits of Local Storage for Initial Prototype
+- **Simple Implementation**: No need for additional backend infrastructure
+- **Performance**: Fast access to data during the questionnaire process
+- **Offline Capability**: Users can continue even with temporary connectivity issues
+- **Reduced Backend Load**: Minimizes database operations during questionnaire completion
 
-To maintain consistency between MongoDB and Redis/Valkey:
+#### Limitations and Mitigation Strategies
+- **Storage Limit** (5-10MB per domain):
+  - Implement efficient data storage with minimal overhead
+  - Periodically clean up unnecessary data
+  - Monitor storage usage and warn users if approaching limits
 
-- Use a **write-through cache** pattern for critical data:
-  1. Write data to MongoDB first
-  2. Then update Redis/Valkey cache
-  3. If Redis/Valkey update fails, implement retry logic or cache invalidation
+- **Data Loss Risks**:
+  - Provide clear instructions to not clear browser data during questionnaire
+  - Implement "save to account" functionality at key points
+  - Offer email links to resume questionnaire
 
-- Implement **cache invalidation** when data is updated directly in MongoDB:
-  1. After MongoDB update, delete or update corresponding Redis/Valkey keys
-  2. Use event-driven architecture to trigger cache updates when possible
+- **Device-Specific Storage**:
+  - Clearly communicate that progress is tied to current device
+  - Provide clear UI indicators for saved progress
+  - Suggest completing questionnaire in one session when possible
 
-- Set appropriate **TTL values** for Redis/Valkey keys:
-  - Short TTLs for frequently changing data
-  - Longer TTLs for relatively static data
-  - Match TTLs to usage patterns (e.g., longer TTLs during active sessions)
+- **Security Considerations**:
+  - Store only non-sensitive information locally
+  - Use HTTPS to protect data in transit
+  - Implement final submission through secure API
 
-- Implement **fallback mechanism**:
-  1. First try to read from Redis/Valkey
-  2. If key missing or expired, read from MongoDB
-  3. Re-populate Redis/Valkey cache with fresh data
+### 3. Data Flow Between Frontend and Backend
 
-### 3. Error Handling
+1. **Initial Authentication**:
+   - User authenticates via Google OAuth
+   - Backend creates/retrieves user in MongoDB
+   - Frontend initializes local storage with family ID
 
-- Implement **retry logic** for failed MongoDB operations
-- Create **recovery procedures** for Redis/Valkey cache misses
-- Log synchronization issues between databases
-- Implement monitoring alerts for data inconsistencies
+2. **Questionnaire Progress**:
+   - All draft responses and progress saved to local storage
+   - No backend calls for saving progress in the initial prototype
+   - Frontend manages questionnaire state and navigation
 
-### 4. Scaling Considerations
+3. **Final Submission**:
+   - When questionnaire is complete, all data is sent to backend
+   - Backend validates and stores data in MongoDB
+   - Frontend clears localStorage after successful submission
 
-- Use MongoDB replica sets for high availability
-- Implement sharding strategy for MongoDB based on `familyId`
-- Configure Redis/Valkey cluster mode for larger deployments
-- Use connection pooling for both database systems
-- Implement proper query timeout and circuit breaker patterns
+4. **Schedule Generation**:
+   - Backend retrieves questionnaire data from MongoDB
+   - ML model generates schedule based on user preferences
+   - Schedule is stored in MongoDB and returned to frontend
 
-## Next Steps for Database Implementation
+### 4. Error Handling
 
-1. Set up MongoDB Atlas cluster or self-hosted MongoDB
-2. Configure Redis/Valkey instance with appropriate memory allocation
-3. Create database schemas with validation
-4. Implement data access layer for consistent database interactions
-5. Set up monitoring and alerting for both database systems
-6. Create backup and recovery procedures
+- **localStorage Unavailability**:
+  - Detect localStorage support on page load
+  - Provide fallback option to complete questionnaire in one session
+  - Warn users about potential data loss if localStorage is unavailable
+
+- **Storage Quota Exceeded**:
+  - Implement storage monitoring
+  - Offer data cleanup options if quota is reached
+  - Prioritize critical data if storage is limited
+
+- **Data Corruption**:
+  - Validate data structure when loading from localStorage
+  - Implement recovery mechanisms for partially corrupted data
+  - Log errors for debugging purposes
+
+### 5. Migration Path to Server-Side Storage
+
+For future iterations, a clear migration path to server-side storage with Redis/Valkey should be planned:
+
+1. **Implementation Phases**:
+   - Phase 1 (Current): localStorage for questionnaire progress
+   - Phase 2: Dual storage (localStorage with optional server sync)
+   - Phase 3: Primary server-side storage with Redis/Valkey
+   - Phase 4: Full Redis/Valkey implementation with enhanced features
+
+2. **Data Migration**:
+   - Develop API endpoints for progress synchronization
+   - Implement data conversion utilities
+   - Ensure backward compatibility during transition
+
+3. **Feature Enhancements with Server Storage**:
+   - Cross-device continuation
+   - Real-time updates and collaboration
+   - Advanced analytics on questionnaire completion
+   - Better session management and security
+
+## Code Examples for Implementation
+
+### 1. Frontend Local Storage Service
+
+```javascript
+// src/services/storage/questionnaireStorage.js
+
+const STORAGE_PREFIX = 'brightpath_';
+
+export const QuestionnaireStorageService = {
+  // Save overall progress
+  saveProgress: (familyId, progressData) => {
+    const key = `${STORAGE_PREFIX}questionnaire_progress_${familyId}`;
+    const data = {
+      ...progressData,
+      lastUpdated: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error('Error saving questionnaire progress:', error);
+      return false;
+    }
+  },
+  
+  // Get saved progress
+  getProgress: (familyId) => {
+    const key = `${STORAGE_PREFIX}questionnaire_progress_${familyId}`;
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error retrieving questionnaire progress:', error);
+      return null;
+    }
+  },
+  
+  // Save section draft data
+  saveSectionDraft: (familyId, sectionId, data) => {
+    const key = `${STORAGE_PREFIX}questionnaire_draft_${familyId}_${sectionId}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error saving section ${sectionId} draft:`, error);
+      return false;
+    }
+  },
+  
+  // Get section draft data
+  getSectionDraft: (familyId, sectionId) => {
+    const key = `${STORAGE_PREFIX}questionnaire_draft_${familyId}_${sectionId}`;
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error retrieving section ${sectionId} draft:`, error);
+      return null;
+    }
+  },
+  
+  // Save child-specific section draft
+  saveChildSectionDraft: (familyId, childId, sectionId, data) => {
+    const key = `${STORAGE_PREFIX}questionnaire_draft_${familyId}_child_${childId}_${sectionId}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error saving child ${childId} section ${sectionId} draft:`, error);
+      return false;
+    }
+  },
+  
+  // Get child-specific section draft
+  getChildSectionDraft: (familyId, childId, sectionId) => {
+    const key = `${STORAGE_PREFIX}questionnaire_draft_${familyId}_child_${childId}_${sectionId}`;
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error retrieving child ${childId} section ${sectionId} draft:`, error);
+      return null;
+    }
+  },
+  
+  // Clear all questionnaire data after successful submission
+  clearQuestionnaireData: (familyId) => {
+    try {
+      // Get all keys in localStorage
+      const keys = Object.keys(localStorage);
+      
+      // Filter keys related to this family's questionnaire
+      const familyKeys = keys.filter(key => 
+        key.startsWith(`${STORAGE_PREFIX}questionnaire_`) && 
+        key.includes(`_${familyId}_`)
+      );
+      
+      // Remove each key
+      familyKeys.forEach(key => localStorage.removeItem(key));
+      
+      // Also remove the main progress key
+      localStorage.removeItem(`${STORAGE_PREFIX}questionnaire_progress_${familyId}`);
+      
+      return true;
+    } catch (error) {
+      console.error('Error clearing questionnaire data:', error);
+      return false;
+    }
+  },
+  
+  // Check available storage space
+  checkStorageSpace: () => {
+    try {
+      const testKey = `${STORAGE_PREFIX}storage_test`;
+      let data = 'a';
+      
+      // Try to fill storage to test limits
+      while (true) {
+        localStorage.setItem(testKey, data);
+        data = data + data; // Double the size each time
+        
+        // Safety check - stop if data gets too large
+        if (data.length > 1000000) {
+          break;
+        }
+      }
+    } catch (e) {
+      // We reached the storage limit
+      localStorage.removeItem(`${STORAGE_PREFIX}storage_test`);
+      return false;
+    }
+    
+    // If we got here without exception, storage is available
+    localStorage.removeItem(`${STORAGE_PREFIX}storage_test`);
+    return true;
+  }
+};
+```
+
+### 2. React Hook for Local Storage Integration
+
+```javascript
+// src/hooks/useQuestionnaireStorage.js
+
+import { useState, useEffect } from 'react';
+import { QuestionnaireStorageService } from '../services/storage/questionnaireStorage';
+
+export function useQuestionnaireStorage(familyId, sectionId, initialData = null) {
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load data on initial render
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Get data from localStorage
+        const savedData = QuestionnaireStorageService.getSectionDraft(familyId, sectionId);
+        
+        // Use saved data if available, otherwise use initial data
+        setData(savedData || initialData);
+      } catch (err) {
+        setError('Failed to load saved data');
+        console.error(err);
+        setData(initialData); // Fallback to initial data
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [familyId, sectionId, initialData]);
+
+  // Save data function
+  const saveData = async (newData) => {
+    try {
+      setData(newData);
+      QuestionnaireStorageService.saveSectionDraft(familyId, sectionId, newData);
+      return true;
+    } catch (err) {
+      setError('Failed to save data');
+      console.error(err);
+      return false;
+    }
+  };
+
+  return { data, isLoading, error, saveData };
+}
+```
+
+### 3. Backend Questionnaire Submission Endpoint
+
+```python
+# api/apps/questionnaire/views.py
+
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.utils import timezone
+
+from .serializers import QuestionnaireSerializer
+from ..db.models import Family, Child
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_questionnaire(request):
+    """
+    Endpoint for submitting the completed questionnaire data
+    """
+    serializer = QuestionnaireSerializer(data=request.data)
+    if serializer.is_valid():
+        # Get the authenticated family
+        family = Family.objects.get(user=request.user)
+        
+        # Update family preferences and commitments
+        family.preferences = serializer.validated_data.get('preferences')
+        family.commitments = serializer.validated_data.get('commitments')
+        family.questionnaireCompleted = True
+        family.questionnaireCompletedAt = timezone.now()
+        family.save()
+        
+        # Process children data
+        children_data = serializer.validated_data.get('children', [])
+        for child_data in children_data:
+            child_id = child_data.get('id')
+            if child_id and child_id.startswith('temp_'):
+                # This is a new child that was created during the questionnaire
+                child = Child(
+                    familyId=family.id,
+                    name=child_data.get('name'),
+                    age=child_data.get('age'),
+                    commitments=child_data.get('commitments', []),
+                    learningPreferences=child_data.get('learningPreferences', {}),
+                    subjects=child_data.get('subjects', [])
+                )
+                child.save()
+            else:
+                # Update existing child
+                try:
+                    child = Child.objects.get(id=child_id, familyId=family.id)
+                    child.name = child_data.get('name', child.name)
+                    child.age = child_data.get('age', child.age)
+                    child.commitments = child_data.get('commitments', child.commitments)
+                    child.learningPreferences = child_data.get('learningPreferences', child.learningPreferences)
+                    child.subjects = child_data.get('subjects', child.subjects)
+                    child.save()
+                except Child.DoesNotExist:
+                    return Response(
+                        {"error": f"Child with ID {child_id} not found"}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+        
+        # Trigger schedule generation (could be done asynchronously)
+        # schedule_generation_service.generate_schedules_for_family(family.id)
+        
+        return Response({"status": "success", "message": "Questionnaire data saved successfully"})
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+```
+
+## Progressive Disclosure Implementation for Questionnaire
+
+The questionnaire will follow a progressive disclosure pattern to guide users through the process:
+
+```javascript
+// src/components/questionnaire/ProgressiveSection.jsx
+
+import React, { useState, useEffect } from 'react';
+import { QuestionnaireStorageService } from '../../services/storage/questionnaireStorage';
+
+export default function ProgressiveSection({ 
+  familyId, 
+  sectionId, 
+  previousSection,
+  nextSection,
+  children 
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  
+  useEffect(() => {
+    // Load progress from localStorage
+    const progress = QuestionnaireStorageService.getProgress(familyId);
+    
+    if (progress) {
+      // Determine if this section should be visible
+      const sectionStatus = progress.progress[`section${sectionId}`];
+      const previousSectionStatus = previousSection 
+        ? progress.progress[`section${previousSection}`] 
+        : 'complete';
+      
+      // Section is visible if previous is complete or if this section is in progress
+      setIsVisible(
+        previousSectionStatus === 'complete' || 
+        sectionStatus === 'in_progress' ||
+        sectionStatus === 'complete'
+      );
+      
+      // Set completed state
+      setCompleted(sectionStatus === 'complete');
+    } else if (sectionId === 1) {
+      // First section is always visible
+      setIsVisible(true);
+    }
+  }, [familyId, sectionId, previousSection]);
+  
+  const markSectionCompleted = () => {
+    // Get current progress
+    const progress = QuestionnaireStorageService.getProgress(familyId) || {
+      currentSection: 1,
+      progress: {}
+    };
+    
+    // Update progress for this section
+    progress.progress[`section${sectionId}`] = 'complete';
+    
+    // Set next section as current and in-progress
+    if (nextSection) {
+      progress.currentSection = nextSection;
+      progress.progress[`section${nextSection}`] = 'in_progress';
+    }
+    
+    // Save updated progress
+    QuestionnaireStorageService.saveProgress(familyId, progress);
+    
+    // Update local state
+    setCompleted(true);
+  };
+  
+  if (!isVisible) {
+    return null;
+  }
+  
+  return (
+    <div className="questionnaire-section">
+      {React.cloneElement(children, { 
+        familyId, 
+        sectionId,
+        onComplete: markSectionCompleted,
+        isCompleted: completed
+      })}
+    </div>
+  );
+}
+```
+
+## Conclusion
+
+The revised database design for BrightPath uses MongoDB for persistent storage while leveraging the browser's localStorage for questionnaire progress in the initial prototype. This approach offers several advantages:
+
+1. **Simplified Initial Implementation**: Using localStorage removes the need for additional backend infrastructure during the prototype phase.
+
+2. **Enhanced User Experience**: Progress is automatically saved locally, allowing users to continue from where they left off.
+
+3. **Scalable Database Design**: The MongoDB schema is designed to accommodate future growth and feature enhancements.
+
+4. **Clear Migration Path**: A straightforward upgrade path to Redis/Valkey for server-side storage in future iterations.
+
+This hybrid approach allows for rapid development of the initial prototype while maintaining a clear path to a more robust server-side solution as the application matures.

@@ -63,7 +63,7 @@ Based on stakeholder feedback and technical analysis, the technology stack has b
 - **Django** with **Python 3.12**
 - **Django REST Framework** for API development
 - **MongoDB** for primary persistent storage
-- **Redis/Valkey** for caching and real-time features
+- **Local Storage** for onboarding questionnaire progress in the initial prototype
 - **Google OAuth** for authentication
 
 ### Machine Learning
@@ -81,7 +81,7 @@ Based on stakeholder feedback and technical analysis, the technology stack has b
 
 ## System Architecture
 
-BrightPath follows a modern, scalable architecture with clear separation of concerns. The revised architecture now includes MongoDB and Redis/Valkey in a hybrid database approach:
+BrightPath follows a modern, scalable architecture with clear separation of concerns. The revised architecture now includes MongoDB with browser local storage used for questionnaire progress in the initial prototype:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -90,14 +90,14 @@ BrightPath follows a modern, scalable architecture with clear separation of conc
 │  (Vite)         │◀────│  (REST)         │◀────│  (Document DB)  │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │   ▲                   │   ▲
-                               │   │                   │   │
-                               ▼   │                   ▼   │
-                        ┌─────────────────┐     ┌─────────────────┐
-                        │                 │     │                 │
-                        │  ML Services    │─────│  Redis/Valkey   │
-                        │                 │     │  (Cache/RT)     │
-                        └─────────────────┘     └─────────────────┘
+        │                        │                     │   
+        │                        │                     │   
+        ▼                        ▼                     ▼   
+┌─────────────────┐     ┌─────────────────┐     
+│                 │     │                 │     
+│  Local Storage  │     │  ML Services    │     
+│  (Questionnaire)│     │                 │     
+└─────────────────┘     └─────────────────┘     
 ```
 
 The architecture consists of five main components:
@@ -106,9 +106,9 @@ The architecture consists of five main components:
 
 2. **Backend API:** A Django REST Framework API that handles user authentication, data management, and business logic.
 
-3. **Primary Database (MongoDB):** A document database that stores user data, questionnaire responses, schedules, and application state. Chosen for its flexibility with evolving schemas and natural fit for the hierarchical data structures required.
+3. **Primary Database (MongoDB):** A document database that stores user data, final questionnaire responses, schedules, and application state. Chosen for its flexibility with evolving schemas and natural fit for the hierarchical data structures required.
 
-4. **Caching Layer (Redis/Valkey):** Handles session management, real-time updates, and caching of frequently accessed data to improve performance and enable real-time features.
+4. **Local Storage (Browser):** Used for storing questionnaire progress during onboarding in the initial prototype, allowing users to save and continue the questionnaire across sessions.
 
 5. **ML Services:** Machine learning models for schedule generation and optimization, with a feedback loop for continuous improvement.
 
@@ -121,7 +121,7 @@ BrightPath will implement Google OAuth for authentication, providing a secure an
    - User authorizes the application through Google's consent screen
    - User is redirected back to BrightPath with authorization code
    - Backend exchanges code for tokens and creates/updates user account
-   - User session is established in Redis/Valkey
+   - User session is established
 
 2. **Benefits:**
    - Simplified onboarding process
@@ -147,7 +147,7 @@ BrightPath will use Radix UI for its component library, providing accessible, co
 
 ## Database Strategy
 
-BrightPath will use a hybrid approach with MongoDB and Redis/Valkey to balance flexibility, performance, and real-time functionality:
+BrightPath will use MongoDB for persistent storage, with browser local storage for questionnaire progress in the initial prototype:
 
 1. **MongoDB for Persistent Storage:**
    - Family profiles and preferences
@@ -156,21 +156,20 @@ BrightPath will use a hybrid approach with MongoDB and Redis/Valkey to balance f
    - Generated schedules and history
    - Activity completion logs
    - ML model parameters and training data
+   - Final questionnaire responses
 
-2. **Redis/Valkey for Real-time and Caching:**
-   - Session management
-   - Questionnaire progress tracking
-   - Real-time schedule updates
-   - Cached schedules for quick access
-   - ML model parameter caching
-   - Usage metrics and monitoring
+2. **Local Storage for Questionnaire Progress:**
+   - Draft questionnaire responses
+   - Section completion status
+   - Current position in the questionnaire flow
+   - Temporary user preferences during onboarding
 
 3. **Benefits:**
    - Flexible schema for evolving requirements
    - Natural representation of hierarchical data
-   - High performance for real-time operations
-   - Reliable persistent storage
-   - Simplified caching implementation
+   - Simplified initial implementation using local storage
+   - No need for additional infrastructure in the prototype phase
+   - Reliable persistent storage for completed data in MongoDB
 
 ## Questionnaire Design
 
@@ -180,7 +179,7 @@ The BrightPath onboarding questionnaire follows a TurboTax-like experience to ga
    - Progressive disclosure - Questions are organized in logical sections
    - Smart defaults - Age-appropriate suggestions based on child's age
    - Visual assistance - Examples and visual aids enhance understanding
-   - Save progress - Automatic saving for later continuation
+   - Save progress - Automatic saving to local storage for later continuation
 
 2. **Multi-Child Support:**
    - Family-wide sections collected once
@@ -197,9 +196,9 @@ The BrightPath onboarding questionnaire follows a TurboTax-like experience to ga
    - Learning & Teaching Preferences
 
 4. **Implementation:**
-   - Draft responses stored in Redis/Valkey
+   - Draft responses stored in browser local storage
    - Final responses committed to MongoDB
-   - Progress tracking across devices
+   - Progress tracking across browser sessions
    - Smart validation and suggestions
 
 ## Machine Learning Approach
@@ -231,9 +230,9 @@ These models work together in a continuous improvement loop:
 
 The development of BrightPath follows an iterative, phased approach:
 
-1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create database schemas for MongoDB and Redis/Valkey.
+1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create database schemas for MongoDB with local storage for questionnaire progress.
 
-2. **Core Functionality Phase:** Implement onboarding questionnaire, schedule management, and initial rule-based schedule generation.
+2. **Core Functionality Phase:** Implement onboarding questionnaire with local storage, schedule management, and initial rule-based schedule generation.
 
 3. **ML Integration Phase:** Develop ML models, create feedback collection system, and implement continuous improvement pipeline.
 
@@ -253,8 +252,8 @@ BrightPath will be deployed on Digital Ocean, providing a cost-effective and str
 
 2. **Database Strategy:**
    - MongoDB Atlas for managed MongoDB service
-   - Digital Ocean Managed Redis/Valkey for caching
-   - Automated backups and point-in-time recovery
+   - Browser local storage for questionnaire progress in the prototype
+   - Automated backups and point-in-time recovery for MongoDB
    - Connection pooling for performance
 
 3. **Monitoring and Logging:**
@@ -293,7 +292,7 @@ The following detailed documents have been created to guide the implementation o
 
 6. **[Questionnaire Design](brightpath_questionnaire.md):** Comprehensive design of the BrightPath onboarding questionnaire.
 
-7. **[Database Design](brightpath_database_design.md):** Detailed database strategy using MongoDB and Redis/Valkey.
+7. **[Database Design](brightpath_database_design.md):** Detailed database strategy using MongoDB with local storage for the questionnaire.
 
 8. **[Terraform Infrastructure Plan](terraform_infrastructure_plan.md):** Comprehensive strategy for provisioning Digital Ocean infrastructure using Terraform.
 
@@ -332,9 +331,15 @@ Beyond the initial implementation, BrightPath has potential for several exciting
    - Offline functionality
    - Push notifications
    - Location-based educational opportunities
+   
+5. **Enhanced Session Management:**
+   - Upgrade from local storage to Redis/Valkey for better questionnaire progress tracking
+   - Real-time updates and synchronization
+   - Multi-device session support
+   - Analytics on questionnaire completion rates
 
 ## Conclusion
 
 BrightPath represents a significant opportunity to transform the homeschooling experience by leveraging modern technology to address the unique challenges faced by homeschooling families. By providing intelligent, personalized scheduling recommendations and continuous improvement through user feedback, BrightPath aims to become an essential tool that empowers parents to create effective, engaging educational experiences for their children.
 
-The revised technology stack, database strategy, and questionnaire design align with stakeholder preferences while enhancing the core functionality and architecture of the platform. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.
+The revised technology stack and database strategy, using MongoDB with browser local storage for questionnaire progress in the initial prototype, align with stakeholder preferences while enhancing the core functionality and architecture of the platform. This approach simplifies the initial implementation while maintaining the ability to scale and enhance the platform in future iterations. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.
