@@ -24,18 +24,18 @@ BrightPath is a homeschooling scheduling platform that leverages AI/ML to help p
 
 ## System Architecture
 
-BrightPath will follow a modern, scalable architecture with clear separation of concerns, using MongoDB for persistent storage and browser local storage for questionnaire progress in the initial prototype:
+BrightPath will follow a modern, scalable architecture with clear separation of concerns, using PostgreSQL with JSONB fields for persistent storage and browser local storage for questionnaire progress in the initial prototype:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  React Frontend │────▶│  Django API     │────▶│  MongoDB        │
-│  (Vite)         │◀────│  (REST)         │◀────│  (Document DB)  │
+│  React Frontend │────▶│  Django API     │────▶│  PostgreSQL     │
+│  (Vite)         │◀────│  (REST)         │◀────│  (with JSONB)   │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                        │                     │   
-        │                        │                     │   
-        ▼                        ▼                     ▼   
+        │                        │                       
+        │                        │                       
+        ▼                        ▼                       
 ┌─────────────────┐     ┌─────────────────┐     
 │                 │     │                 │     
 │  Local Storage  │     │  ML Services    │     
@@ -57,21 +57,23 @@ BrightPath will follow a modern, scalable architecture with clear separation of 
    - Authentication and authorization with Google OAuth
 
 3. **Database Strategy**
-   - **MongoDB**: Primary database for persistent storage
-     - Document-oriented data model for flexible schema
-     - Natural fit for hierarchical data structures
-     - Efficient storage for final questionnaire responses and schedule data
-   - **Browser Local Storage**: For questionnaire progress in initial prototype
-     - Save and continue functionality across sessions
-     - Draft questionnaire responses storage
-     - Progress tracking without additional infrastructure
+   - **PostgreSQL with JSONB fields**:
+     - Relational tables for structured data (users, families, children, subjects)
+     - JSONB fields for flexible, hierarchical data (preferences, schedules, ML model parameters)
+     - Best of both worlds: Schema enforcement where needed, flexibility where appropriate
 
-4. **ML Services**
+4. **Browser Local Storage**:
+   - For questionnaire progress in initial prototype
+   - Save and continue functionality across sessions
+   - Draft questionnaire responses storage
+   - Progress tracking without additional infrastructure
+
+5. **ML Services**
    - Schedule Generator Model
    - Reward Model for feedback processing
    - Continuous improvement pipeline
 
-5. **Infrastructure**
+6. **Infrastructure**
    - Containerized deployment with Docker
    - CI/CD pipeline with GitHub Actions
    - Monitoring and logging
@@ -220,13 +222,13 @@ export const clearQuestionnaireData = (familyId) => {
 - **Framework**: Django + Django REST Framework
 - **API**: RESTful endpoints
 - **Authentication**: Google OAuth
-- **Database**: MongoDB (primary)
+- **Database**: PostgreSQL with JSONB fields
 - **ML Integration**: Python-based ML models with scikit-learn/TensorFlow
 
 ### Architecture
-The backend will follow Django's architecture with adaptations for MongoDB:
+The backend will follow Django's architecture with adaptations for PostgreSQL+JSONB:
 
-1. **Models**: MongoDB document schemas (using Djongo or PyMongo)
+1. **Models**: Django models with PostgreSQL-specific fields (JSONField)
 2. **Views**: API endpoints and business logic
 3. **Serializers**: Data transformation and validation
 4. **Services**: Business logic and ML model integration
@@ -241,19 +243,19 @@ The backend will follow Django's architecture with adaptations for MongoDB:
 
 2. **Questionnaire System**
    - Endpoints to receive final questionnaire responses
-   - MongoDB persistence for completed questionnaires
+   - PostgreSQL JSONB fields for completed questionnaires
    - Multi-child flow management
    - No server-side progress tracking in the initial prototype
 
 3. **ML Integration**
    - Schedule generator model integration
    - Reward model for feedback processing
-   - ML parameter storage in MongoDB
+   - ML parameter storage in JSONB fields
    - Continuous learning pipeline
 
 4. **Schedule Management**
    - ML-powered schedule generation
-   - Schedule storage in MongoDB
+   - Schedule storage using hybrid relational/JSONB approach
    - Activity completion tracking
 
 5. **Feedback System**
@@ -283,290 +285,71 @@ api/
 │   ├── reward/
 │   └── training/
 ├── utils/
-├── db/
-│   ├── connection.py
-│   ├── schemas.py
-│   └── validators.py
 ├── manage.py
 └── requirements.txt
 ```
 
 ## Database Design
 
-The database design will utilize MongoDB for persistent storage, with browser local storage for questionnaire progress in the initial prototype.
+The database design will use PostgreSQL with JSONB fields to leverage both relational structure and document flexibility in a single database, alongside browser local storage for questionnaire progress in the initial prototype.
 
-### MongoDB Collections
+### Key Tables and Fields
 
-#### 1. families Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "googleId": "google_provided_id", // For OAuth authentication
-  "email": "sarah@example.com", // From Google OAuth
-  "name": "Sarah Kim", // From questionnaire
-  "createdAt": ISODate("2025-04-01"),
-  "lastLogin": ISODate("2025-04-03"),
-  "preferences": {
-    "schedulingFlexibility": "moderate_structure",
-    "homeschoolingPhilosophy": {
-      "traditional": 2,
-      "charlotte_mason": 5,
-      "montessori": 3,
-      "classical": 1,
-      "unschooling": 4
-    },
-    "schedulingStyle": {
-      "block": 4,
-      "loop": 3,
-      "time_blocked": 2,
-      "interest_led": 5,
-      "grouped_activities": 3
-    },
-    "planningApproach": "mix_of_planned_and_spontaneous",
-    "activityPreferences": {
-      "textbooks_worksheets": 2,
-      "nature_exploration": 5,
-      "arts_crafts": 4,
-      "memorization": 2,
-      "research_projects": 3,
-      "experiments": 5,
-      "discussions": 4
-    }
-  },
-  "commitments": [
-    // Family-wide commitments
-    {
-      "name": "Work Meeting",
-      "frequency": "weekly",
-      "daysOfWeek": ["Tuesday", "Thursday"],
-      "startTime": "10:00",
-      "endTime": "11:30"
-    }
-  ],
-  "questionnaireCompleted": true,
-  "questionnaireCompletedAt": ISODate("2025-04-01T10:30:00Z")
-}
-```
+1. **users**: Core user authentication and profile data
+   - Standard fields: id, email, name, google_id, etc.
+   - Questionnaire completion tracking
 
-#### 2. children Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "familyId": ObjectId("..."), // Reference to parent family
-  "name": "Noah",
-  "age": 6,
-  "createdAt": ISODate("2025-04-01"),
-  "commitments": [
-    // Child-specific commitments
-    {
-      "name": "Soccer Practice",
-      "frequency": "weekly",
-      "daysOfWeek": ["Monday", "Wednesday"],
-      "startTime": "16:00",
-      "endTime": "17:00"
-    }
-  ],
-  "learningPreferences": {
-    "bestLearningTimes": ["mid-morning", "early_afternoon"],
-    "homeschoolingHours": {
-      "startTime": "09:00",
-      "endTime": "14:00"
-    }
-  },
-  "subjects": [
-    {
-      "name": "Mathematics",
-      "isCoreSubject": true,
-      "sessionDuration": 30, // minutes
-      "frequency": "daily",
-      "parentInvolvement": "some_assistance",
-      "fixedTime": {
-        "required": false,
-        "preferredTime": null
-      },
-      "interestLevel": 4 // 1-5 scale
-    },
-    // Additional subjects...
-  ]
-}
-```
+2. **families**: Family data and preferences
+   - Core fields: id, user_id, name
+   - JSONB fields: 
+     - preferences (detailed preferences from questionnaire)
+     - questionnaire_responses (complete family-wide responses)
 
-#### 3. schedules Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "familyId": ObjectId("..."),
-  "childId": ObjectId("..."),
-  "weekStartDate": ISODate("2025-04-07"),
-  "createdAt": ISODate("2025-04-01"),
-  "updatedAt": ISODate("2025-04-01"),
-  "version": 1, // Increments with each regeneration
-  "isActive": true,
-  "generationMethod": "ml_model_v1",
-  "days": [
-    {
-      "date": ISODate("2025-04-07"),
-      "dayOfWeek": "Monday",
-      "items": [
-        {
-          "_id": ObjectId("..."),
-          "type": "subject",
-          "name": "Mathematics",
-          "originalSubject": {
-            "name": "Mathematics",
-            "isCoreSubject": true,
-            "sessionDuration": 30,
-            "parentInvolvement": "some_assistance"
-          },
-          "startTime": "09:30",
-          "endTime": "10:00",
-          "completed": false,
-          "notes": ""
-        },
-        // More scheduled items...
-      ]
-    }
-    // More days...
-  ]
-}
-```
+3. **children**: Child profiles and learning preferences
+   - Core fields: id, family_id, name, age
+   - JSONB fields:
+     - learning_preferences (learning times, styles)
+     - questionnaire_responses (child-specific responses)
 
-#### 4. activity_logs Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "scheduleId": ObjectId("..."),
-  "scheduleItemId": ObjectId("..."),
-  "familyId": ObjectId("..."),
-  "childId": ObjectId("..."),
-  "date": ISODate("2025-04-07"),
-  "activityName": "Mathematics",
-  "activityType": "subject",
-  "scheduled": {
-    "startTime": "09:30",
-    "endTime": "10:00"
-  },
-  "actual": {
-    "completed": true,
-    "completedAt": ISODate("2025-04-07T10:05:00Z"), 
-    "startTime": "09:35", // Optional
-    "endTime": "10:05" // Optional
-  },
-  "notes": "Noah enjoyed the counting activities today",
-  "createdAt": ISODate("2025-04-07T10:05:00Z")
-}
-```
+4. **subjects**: Academic subjects for each child
+   - Core fields: name, session_duration, frequency, etc.
+   - JSONB field: metadata (flexible additional data)
 
-#### 5. ml_models Collection
-```javascript
-{
-  "_id": ObjectId("..."),
-  "name": "schedule_generator_v1",
-  "version": "1.0.0",
-  "createdAt": ISODate("2025-03-15"),
-  "parameters": {
-    // Model-specific parameters
-  },
-  "featureImportance": {
-    // Information about which features most impact schedule generation
-  },
-  "performance": {
-    "averageSatisfactionScore": 4.2,
-    "usageCount": 1245
-  }
-}
-```
+5. **schedules**: Weekly schedules
+   - Core fields: child_id, week_start_date, version
+   - JSONB fields:
+     - schedule_data (complete schedule structure)
+     - patterns (ML-detected patterns and insights)
 
-### Local Storage Schema
+6. **schedule_items**: Individual activities in schedules
+   - Core fields: schedule_id, day_date, item_type, name, times
+   - JSONB field: item_data (flexible item-specific details)
 
-For the initial prototype, the browser's localStorage will be used to store questionnaire progress and draft responses. The following key patterns will be used:
+7. **activity_logs**: Record of activity completion
+   - Core fields: schedule_item_id, date, activity_name
+   - JSONB fields:
+     - scheduled (original scheduled data)
+     - actual (what actually happened, including completion)
 
-```
-// Overall questionnaire progress
-questionnaire_progress_{familyId} -> {
-  "currentSection": 4,
-  "currentChild": "child_id_1",
-  "lastUpdated": "2025-04-03T15:30:00Z",
-  "sectionsCompleted": ["section1", "section2", "section3"],
-  "childSpecificProgress": {
-    "child_id_1": {
-      "section3Child": "complete",
-      "section4": "in_progress"
-    }
-  }
-}
+### PostgreSQL-Specific Features
 
-// Draft responses for each section
-questionnaire_draft_{familyId}_{sectionId} -> {
-  // Draft responses for current section
-}
+1. **JSONB Indexing**:
+   - GIN indexes for containment operations
+   - Path-specific indexes for frequently accessed JSON paths
+   - B-tree indexes for equality comparisons on JSON values
 
-// Child-specific draft responses
-questionnaire_draft_{familyId}_{childId}_{sectionId} -> {
-  // Child-specific draft responses
-}
-```
+2. **JSONB Queries**:
+   - Containment operators (@>, ?, ?&, ?|)
+   - Path expressions for direct value access
+   - JSON functions for manipulation and transformation
 
-### Implementation Considerations
+3. **Schema Evolution**:
+   - Core fields enforced by relational schema
+   - Flexible evolution of JSONB fields without migrations
 
-#### 1. Indexing Strategy for MongoDB
-
-- `families`:
-  - `googleId` (unique)
-  - `email` (unique)
-
-- `children`:
-  - `familyId`
-  - `name` (for search functionality)
-
-- `schedules`:
-  - `familyId`
-  - `childId`
-  - `weekStartDate`
-  - Compound index: `{childId: 1, weekStartDate: 1}`
-
-- `activity_logs`:
-  - `scheduleId`
-  - `scheduleItemId`
-  - `date`
-  - Compound index: `{childId: 1, date: 1}`
-
-#### 2. Local Storage Limitations and Solutions
-
-- **Storage Limit**: Most browsers limit localStorage to 5-10MB per domain. Solutions:
-  - Minimal data storage (only essential responses and state)
-  - Data compression for larger responses
-  - Periodic cleanup of unnecessary data
-
-- **Data Loss Risks**: localStorage can be cleared by users. Solutions:
-  - Regular reminders to complete the questionnaire
-  - Automatic syncing of completed sections to MongoDB when possible
-  - Clear instructions to not clear browser data during questionnaire
-
-- **Security Considerations**: localStorage is not secure for sensitive data. Solutions:
-  - Store only non-sensitive information locally
-  - Final submission of data occurs through secure API connection to backend
-  - Encrypt any potentially sensitive information with a session key
-
-- **Cross-Device Limitations**: localStorage is device-specific. Solutions:
-  - Clearly communicate that questionnaire progress is tied to current device
-  - Offer to email a resumption link for later continuation
-  - In future iterations, migrate to server-based progress tracking with Redis/Valkey
-
-#### 3. Migration Path to Server-Side Storage
-
-As part of the future enhancements, a clear migration path should be established for moving from local storage to Redis/Valkey for questionnaire progress:
-
-1. **Data Migration**:
-   - Add backend endpoints for saving and retrieving questionnaire progress
-   - Implement dual-write approach during transition phase
-   - Gradually migrate to server-side storage while maintaining backward compatibility
-
-2. **Feature Enhancements**:
-   - Multi-device continuation
-   - Real-time progress tracking
-   - Advanced analytics on questionnaire completion rates
-   - Better handling of multi-user scenarios
+4. **Transactional Integrity**:
+   - ACID guarantees for all operations
+   - Atomicity across related tables and JSONB fields
 
 ## Machine Learning Implementation
 
@@ -583,7 +366,7 @@ BrightPath will implement two key ML models:
   - Child age and characteristics
   - Subject preferences
   - Time constraints
-- **Output**: Schedule configuration (MongoDB document structure)
+- **Output**: Schedule configuration (PostgreSQL JSONB structure)
 - **Training**: Initially trained on synthetic data, then refined with real user data
 
 **Development Steps**:
@@ -628,37 +411,30 @@ BrightPath will implement two key ML models:
 └─────────────────┘     └─────────────────┘
 ```
 
-### ML Service Architecture
+### ML Model Storage
 
-```
-ml/
-├── data/
-│   ├── preprocessing/
-│   ├── synthetic/
-│   └── validation/
-├── models/
-│   ├── generator/
-│   └── reward/
-├── training/
-│   ├── generator_training.py
-│   └── reward_training.py
-├── inference/
-│   ├── generator_inference.py
-│   └── reward_inference.py
-└── evaluation/
-    ├── metrics.py
-    └── validation.py
-```
+ML models and their parameters will be stored in PostgreSQL using JSONB fields:
 
-### ML Model Integration with Database
-- Store model parameters in MongoDB for persistence
-- Use MongoDB for storing training data and evaluation metrics
+```python
+class MLModel(models.Model):
+    name = models.CharField(max_length=255)
+    version = models.CharField(max_length=50)
+    description = models.TextField(blank=True)
+    
+    # JSONB fields for flexible storage
+    parameters = JSONField()  # Model parameters
+    feature_importance = JSONField(default=dict)  # Feature importance data
+    performance_metrics = JSONField(default=dict)  # Performance metrics
+    
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+```
 
 ## Development Roadmap
 
 ### Phase 1: Foundation (Months 1-2)
 - Set up project infrastructure
-- Implement MongoDB setup
+- Implement PostgreSQL database with JSONB fields
 - Create database schemas and indexes
 - Implement Google OAuth authentication
 - Build local storage service for questionnaire progress
@@ -704,12 +480,13 @@ ml/
 ### Backend Testing
 - **Unit Tests**: Django test framework for models and services
 - **API Tests**: DRF test framework for API endpoints
-- **Database Tests**: Test MongoDB interactions
+- **Database Tests**: Test PostgreSQL JSONB interactions
 - **Performance Tests**: Load testing with Locust
 
 ### Database Testing
-- **Schema Validation**: Test MongoDB validation rules
-- **Indexing Performance**: Validate query performance
+- **Schema Validation**: Test PostgreSQL validation rules
+- **JSONB Query Tests**: Test complex JSONB queries and operations
+- **Indexing Performance**: Validate query performance with realistic data volumes
 
 ### ML Testing
 - **Model Validation**: Cross-validation and holdout testing
@@ -733,14 +510,14 @@ ml/
 - **Production**: Live environment for end users
 
 ### Database Deployment
-- **MongoDB**: MongoDB Atlas for managed service
-- **Backup Strategy**: Automated daily backups for MongoDB
-- **Scaling Strategy**: Horizontal scaling for MongoDB
+- **PostgreSQL**: Managed PostgreSQL service in Digital Ocean
+- **Backup Strategy**: Automated daily backups
+- **Scaling Strategy**: Connection pooling and read replicas as needed
 
 ### Digital Ocean Infrastructure
 - **Web Servers**: Digital Ocean Droplets for hosting the Django application
 - **Load Balancer**: Digital Ocean Load Balancer for distributing traffic
-- **Databases**: MongoDB Atlas
+- **Database**: Managed PostgreSQL Database Cluster
 - **Object Storage**: Digital Ocean Spaces for static files and user uploads
 - **Monitoring**: Digital Ocean Monitoring integrated with Prometheus/Grafana
 
@@ -773,7 +550,7 @@ To ensure compliance with the Children's Online Privacy Protection Act (COPPA):
 ## Future Enhancements
 
 ### Enhanced Session Management
-- **Redis/Valkey Integration**: Migrate from local storage to Redis/Valkey
+- **Server-Side Storage**: Migrate from localStorage to server-side storage
 - **Multi-device Support**: Enable questionnaire continuation across devices
 - **Real-time Synchronization**: Real-time progress updates
 - **Analytics**: Advanced questionnaire completion analytics

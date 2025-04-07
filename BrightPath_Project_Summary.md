@@ -62,7 +62,7 @@ Based on stakeholder feedback and technical analysis, the technology stack has b
 ### Backend
 - **Django** with **Python 3.12**
 - **Django REST Framework** for API development
-- **MongoDB** for primary persistent storage
+- **PostgreSQL** with **JSONB fields** for persistent storage
 - **Local Storage** for onboarding questionnaire progress in the initial prototype
 - **Google OAuth** for authentication
 
@@ -81,18 +81,18 @@ Based on stakeholder feedback and technical analysis, the technology stack has b
 
 ## System Architecture
 
-BrightPath follows a modern, scalable architecture with clear separation of concerns. The revised architecture now includes MongoDB with browser local storage used for questionnaire progress in the initial prototype:
+BrightPath follows a modern, scalable architecture with clear separation of concerns. The revised architecture now includes PostgreSQL with JSONB fields for flexible data storage, with browser local storage used for questionnaire progress in the initial prototype:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  React Frontend │────▶│  Django API     │────▶│  MongoDB        │
-│  (Vite)         │◀────│  (REST)         │◀────│  (Document DB)  │
+│  React Frontend │────▶│  Django API     │────▶│  PostgreSQL     │
+│  (Vite)         │◀────│  (REST)         │◀────│  (with JSONB)   │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                        │                     │   
-        │                        │                     │   
-        ▼                        ▼                     ▼   
+        │                        │                       
+        │                        │                       
+        ▼                        ▼                       
 ┌─────────────────┐     ┌─────────────────┐     
 │                 │     │                 │     
 │  Local Storage  │     │  ML Services    │     
@@ -106,7 +106,11 @@ The architecture consists of five main components:
 
 2. **Backend API:** A Django REST Framework API that handles user authentication, data management, and business logic.
 
-3. **Primary Database (MongoDB):** A document database that stores user data, final questionnaire responses, schedules, and application state. Chosen for its flexibility with evolving schemas and natural fit for the hierarchical data structures required.
+3. **Database (PostgreSQL with JSONB):** A robust relational database that leverages JSONB fields to combine structured data integrity with document flexibility. This approach provides:
+   - Structured tables for core data (users, families, children, subjects)
+   - JSONB fields for complex hierarchical data (preferences, schedules)
+   - Strong transaction guarantees across all data
+   - Advanced querying capabilities for both relational and document data
 
 4. **Local Storage (Browser):** Used for storing questionnaire progress during onboarding in the initial prototype, allowing users to save and continue the questionnaire across sessions.
 
@@ -147,29 +151,36 @@ BrightPath will use Radix UI for its component library, providing accessible, co
 
 ## Database Strategy
 
-BrightPath will use MongoDB for persistent storage, with browser local storage for questionnaire progress in the initial prototype:
+BrightPath will use PostgreSQL with JSONB fields for persistent storage, with browser local storage for questionnaire progress in the initial prototype:
 
-1. **MongoDB for Persistent Storage:**
-   - Family profiles and preferences
-   - Child information
-   - Subject and activity definitions
-   - Generated schedules and history
-   - Activity completion logs
-   - ML model parameters and training data
-   - Final questionnaire responses
+1. **PostgreSQL with JSONB for Persistent Storage:**
+   - Structured tables for core entities (users, families, children, subjects)
+   - JSONB fields for flexible data (preferences, questionnaire responses, schedules)
+   - Best of both worlds: Schema enforcement where needed, flexibility where appropriate
+   - Strong transaction guarantees and referential integrity
 
-2. **Local Storage for Questionnaire Progress:**
+2. **Key Data Storage Areas:**
+   - Family profiles and preferences (structured + JSONB)
+   - Child information and learning styles (structured + JSONB)
+   - Subject and activity definitions (structured)
+   - Generated schedules (structured references + JSONB for schedule details)
+   - Activity completion logs (structured + JSONB for flexible details)
+   - ML model parameters and training data (structured + JSONB)
+   - Final questionnaire responses (JSONB)
+
+3. **Local Storage for Questionnaire Progress:**
    - Draft questionnaire responses
    - Section completion status
    - Current position in the questionnaire flow
    - Temporary user preferences during onboarding
 
-3. **Benefits:**
-   - Flexible schema for evolving requirements
-   - Natural representation of hierarchical data
+4. **Benefits:**
+   - Single database to maintain and scale
+   - Schema flexibility for evolving requirements
+   - Strong transaction guarantees for all operations
    - Simplified initial implementation using local storage
    - No need for additional infrastructure in the prototype phase
-   - Reliable persistent storage for completed data in MongoDB
+   - Advanced querying capabilities for both structured and document data
 
 ## Questionnaire Design
 
@@ -197,7 +208,7 @@ The BrightPath onboarding questionnaire follows a TurboTax-like experience to ga
 
 4. **Implementation:**
    - Draft responses stored in browser local storage
-   - Final responses committed to MongoDB
+   - Final responses committed to PostgreSQL JSONB fields
    - Progress tracking across browser sessions
    - Smart validation and suggestions
 
@@ -230,7 +241,7 @@ These models work together in a continuous improvement loop:
 
 The development of BrightPath follows an iterative, phased approach:
 
-1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create database schemas for MongoDB with local storage for questionnaire progress.
+1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create database schemas for PostgreSQL with JSONB fields.
 
 2. **Core Functionality Phase:** Implement onboarding questionnaire with local storage, schedule management, and initial rule-based schedule generation.
 
@@ -251,9 +262,9 @@ BrightPath will be deployed on Digital Ocean, providing a cost-effective and str
    - Digital Ocean App Platform for orchestration
 
 2. **Database Strategy:**
-   - MongoDB Atlas for managed MongoDB service
+   - Digital Ocean Managed PostgreSQL database
    - Browser local storage for questionnaire progress in the prototype
-   - Automated backups and point-in-time recovery for MongoDB
+   - Automated backups and point-in-time recovery for PostgreSQL
    - Connection pooling for performance
 
 3. **Monitoring and Logging:**
@@ -292,7 +303,7 @@ The following detailed documents have been created to guide the implementation o
 
 6. **[Questionnaire Design](brightpath_questionnaire.md):** Comprehensive design of the BrightPath onboarding questionnaire.
 
-7. **[Database Design](brightpath_database_design.md):** Detailed database strategy using MongoDB with local storage for the questionnaire.
+7. **[Database Design](brightpath_database_design.md):** Detailed database strategy using PostgreSQL with JSONB fields.
 
 8. **[Terraform Infrastructure Plan](terraform_infrastructure_plan.md):** Comprehensive strategy for provisioning Digital Ocean infrastructure using Terraform.
 
@@ -333,7 +344,7 @@ Beyond the initial implementation, BrightPath has potential for several exciting
    - Location-based educational opportunities
    
 5. **Enhanced Session Management:**
-   - Upgrade from local storage to Redis/Valkey for better questionnaire progress tracking
+   - Server-side questionnaire progress tracking
    - Real-time updates and synchronization
    - Multi-device session support
    - Analytics on questionnaire completion rates
@@ -342,4 +353,4 @@ Beyond the initial implementation, BrightPath has potential for several exciting
 
 BrightPath represents a significant opportunity to transform the homeschooling experience by leveraging modern technology to address the unique challenges faced by homeschooling families. By providing intelligent, personalized scheduling recommendations and continuous improvement through user feedback, BrightPath aims to become an essential tool that empowers parents to create effective, engaging educational experiences for their children.
 
-The revised technology stack and database strategy, using MongoDB with browser local storage for questionnaire progress in the initial prototype, align with stakeholder preferences while enhancing the core functionality and architecture of the platform. This approach simplifies the initial implementation while maintaining the ability to scale and enhance the platform in future iterations. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.
+The revised technology stack and database strategy, using PostgreSQL with JSONB fields and browser local storage for questionnaire progress in the initial prototype, align with stakeholder preferences while enhancing the core functionality and architecture of the platform. This approach simplifies the initial implementation while maintaining the ability to scale and enhance the platform in future iterations. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.

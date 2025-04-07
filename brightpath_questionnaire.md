@@ -1,6 +1,6 @@
 # BrightPath Essential Questionnaire
 
-This document outlines the essential questions for the BrightPath homeschooling scheduling platform's initial prototype, including the updated implementation approach using browser local storage for progress tracking.
+This document outlines the essential questions for the BrightPath homeschooling scheduling platform's initial prototype, including the updated implementation approach using browser local storage for progress tracking with PostgreSQL and JSONB fields for final data storage.
 
 ## Questionnaire Flow Overview
 
@@ -238,8 +238,8 @@ questionnaire_draft_{familyId}_child_temp_child_1_section4 -> {
    - Allow navigation between children
 
 4. **Completion & Submission**
-   - Final submission sends all data to backend
-   - Store completion status in MongoDB
+   - Final submission sends all data to PostgreSQL backend
+   - Store completion status and full questionnaire responses in PostgreSQL JSONB fields
    - Clear localStorage after successful submission
 
 ### Implementation Code (React)
@@ -438,6 +438,68 @@ export function useQuestionnaireStorage(familyId, sectionId, initialData = null)
 }
 ```
 
+### PostgreSQL Models for Questionnaire Data
+
+When the questionnaire is completed, data is transferred from localStorage to PostgreSQL:
+
+```python
+# Django models for questionnaire data storage
+
+from django.db import models
+from django.contrib.postgres.fields import JSONField
+
+class Family(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    scheduling_flexibility = models.CharField(max_length=50, null=True, blank=True)
+    planning_approach = models.CharField(max_length=50, null=True, blank=True)
+    
+    # JSONB fields for flexible data
+    preferences = JSONField(default=dict)
+    questionnaire_responses = JSONField(default=dict)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.name
+
+class Child(models.Model):
+    family = models.ForeignKey(Family, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    age = models.IntegerField()
+    
+    # JSONB fields for flexible data
+    learning_preferences = JSONField(default=dict)
+    questionnaire_responses = JSONField(default=dict)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.family.name})"
+
+class Subject(models.Model):
+    child = models.ForeignKey(Child, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    is_core_subject = models.BooleanField(default=False)
+    session_duration = models.IntegerField()  # in minutes
+    frequency = models.CharField(max_length=50)
+    parent_involvement = models.CharField(max_length=50)
+    fixed_time_required = models.BooleanField(default=False)
+    preferred_time = models.TimeField(null=True, blank=True)
+    interest_level = models.IntegerField()
+    
+    # JSONB field for additional metadata
+    metadata = JSONField(default=dict)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.child.name})"
+```
+
 ### Handling Storage Limitations
 
 1. **Space Constraints**
@@ -452,7 +514,7 @@ export function useQuestionnaireStorage(familyId, sectionId, initialData = null)
    - Consider adding reminder messages about device-specific storage
 
 3. **Final Submission**
-   - Send data to backend for permanent storage in MongoDB
+   - Send data to backend for permanent storage in PostgreSQL with JSONB fields
    - Provide clear confirmation of successful submission
    - Clean up localStorage after successful submission
 
@@ -624,12 +686,154 @@ export function useQuestionnaireStorage(familyId, sectionId, initialData = null)
   }
   ```
 
+## Questionnaire Data Submission and Storage
+
+When the user completes the questionnaire, the data is submitted to the backend and stored in PostgreSQL using a combination of relational tables and JSONB fields:
+
+```python
+@transaction.atomic
+def save_questionnaire_data(user_id, data):
+    """Process and save questionnaire data to PostgreSQL"""
+    try:
+        # Get user
+        user = User.objects.get(id=user_id)
+        
+        # Create or update family
+        family, created = Family.objects.get_or_create(user=user)
+        family.name = data['section1']['name']
+        family.scheduling_flexibility = data['section5']['flexibility']
+        family.planning_approach = data['section7']['planningApproach']
+        
+        # Store complete questionnaire responses in JSONB
+        family.questionnaire_responses = {
+            'section1': data['section1'],
+            'section5': data['section5'],
+            'section7': data['section7']
+        }
+        
+        # Process preferences into structured JSONB
+        family.preferences = {
+            'schedulingFlexibility': data['section5']['flexibility'],
+            'homeschoolingPhilosophy': data['section7']['homeschoolingPhilosophy'],
+            'schedulingStyle': data['section7']['schedulingStyle'],
+            'planningApproach': data['section7']['planningApproach'],
+            'activityPreferences': data['section7']['activityPreferences']
+        }
+        
+        family.save()
+        
+        # Process children data
+        for child_data in data['children']:
+            # Create or update child
+            if child_data.get('id') and not child_data['id'].startswith('temp_'):
+                child = Child.objects.get(id=child_data['id'], family=family)
+            else:
+                child = Child(family=family)
+            
+            child.name = child_data['section2']['name']
+            child.age = child_data['section2']['age']
+            
+            # Store child questionnaire data in JSONB
+            child.questionnaire_responses = {
+                'section2': child_data['section2'],
+                'section4': child_data['section4'],
+                'section6': child_data['section6']
+            }
+            
+            # Process learning preferences into structured JSONB
+            child.learning_preferences = {
+                'bestLearningTimes': child_data['section6']['bestLearningTimes'],
+                'homeschoolingHours': {
+                    'startTime': child_data['section6']['startTime'],
+                    'endTime': child_data['section6']['endTime']
+                }
+            }
+            
+            child.save()
+            
+            # Save subjects to structured tables
+            if 'subjects' in child_data.get('section4', {}):
+                # First delete existing subjects
+                Subject.objects.filter(child=child).delete()
+                
+                # Create new subjects
+                for subject_data in child_data['section4']['subjects']:
+                    subject = Subject(
+                        child=child,
+                        name=subject_data['name'],
+                        is_core_subject=subject_data['isCoreSubject'],
+                        session_duration=subject_data['sessionDuration'],
+                        frequency=subject_data['frequency'],
+                        parent_involvement=subject_data['parentInvolvement'],
+                        fixed_time_required=subject_data.get('fixedTime', {}).get('required', False),
+                        interest_level=subject_data['interestLevel']
+                    )
+                    
+                    # Set preferred time if applicable
+                    if subject.fixed_time_required and 'preferredTime' in subject_data.get('fixedTime', {}):
+                        subject.preferred_time = subject_data['fixedTime']['preferredTime']
+                    
+                    # Store additional data in JSONB field
+                    metadata = {k: v for k, v in subject_data.items() 
+                                if k not in ['name', 'isCoreSubject', 'sessionDuration', 
+                                           'frequency', 'parentInvolvement', 'fixedTime', 
+                                           'interestLevel']}
+                    if metadata:
+                        subject.metadata = metadata
+                    
+                    subject.save()
+            
+            # Save commitments to structured tables
+            if 'commitments' in child_data.get('section3Child', {}):
+                # First delete existing commitments
+                ChildCommitment.objects.filter(child=child).delete()
+                
+                # Create new commitments
+                for commitment in child_data['section3Child']['commitments']:
+                    ChildCommitment.objects.create(
+                        child=child,
+                        name=commitment['name'],
+                        frequency=commitment['frequency'],
+                        days_of_week=json.dumps(commitment.get('daysOfWeek', [])),
+                        start_time=commitment['startTime'],
+                        end_time=commitment['endTime']
+                    )
+        
+        # Save family commitments to structured tables
+        if 'commitments' in data.get('section3', {}):
+            # First delete existing commitments
+            FamilyCommitment.objects.filter(family=family).delete()
+            
+            # Create new commitments
+            for commitment in data['section3']['commitments']:
+                FamilyCommitment.objects.create(
+                    family=family,
+                    name=commitment['name'],
+                    frequency=commitment['frequency'],
+                    days_of_week=json.dumps(commitment.get('daysOfWeek', [])),
+                    start_time=commitment['startTime'],
+                    end_time=commitment['endTime']
+                )
+        
+        # Mark questionnaire as completed
+        family.questionnaire_completed = True
+        family.questionnaire_completed_at = timezone.now()
+        family.save()
+        
+        return True, family.id
+    
+    except Exception as e:
+        # Log the error and return
+        logger.error(f"Error saving questionnaire data: {str(e)}")
+        return False, str(e)
+```
+
 ## Future Enhancements for Questionnaire Storage
 
 In future iterations, the questionnaire progress tracking can be enhanced by:
 
 1. **Server-Side Storage**
-   - Migrate from localStorage to Redis/Valkey for server-side storage
+   - Create a `questionnaire_sessions` table in PostgreSQL
    - Enable cross-device continuation of the questionnaire
    - Implement real-time progress tracking and analytics
 
@@ -647,3 +851,75 @@ In future iterations, the questionnaire progress tracking can be enhanced by:
    - Track completion rates and abandonment points
    - Identify problematic questionnaire sections
    - Perform A/B testing on question wording and flow
+
+5. **API Endpoints for Session Management**
+
+```python
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_questionnaire_progress(request):
+    """Save questionnaire progress to server"""
+    user_id = request.user.id
+    session_data = request.data.get('sessionData')
+    
+    if not session_data:
+        return Response({"error": "No session data provided"}, status=400)
+    
+    # Check if session already exists
+    session = QuestionnaireSession.objects.filter(user_id=user_id).first()
+    
+    if session:
+        # Update existing session
+        session.session_data = session_data
+        session.last_updated = timezone.now()
+        session.save()
+    else:
+        # Create new session
+        session = QuestionnaireSession.objects.create(
+            user_id=user_id,
+            session_data=session_data
+        )
+    
+    return Response({"status": "success", "sessionId": session.id})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_questionnaire_progress(request):
+    """Get saved questionnaire progress from server"""
+    user_id = request.user.id
+    
+    try:
+        session = QuestionnaireSession.objects.get(user_id=user_id)
+        return Response(session.session_data)
+    except QuestionnaireSession.DoesNotExist:
+        return Response({"status": "not_found"}, status=404)
+```
+
+6. **PostgreSQL Session Storage Model**
+
+```python
+class QuestionnaireSession(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    family = models.ForeignKey('Family', on_delete=models.CASCADE, null=True, blank=True)
+    session_data = JSONField()
+    last_updated = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['last_updated'])
+        ]
+```
+
+## Conclusion
+
+The BrightPath questionnaire implementation leverages browser localStorage for the initial prototype to provide a seamless user experience with save-and-continue functionality. When the questionnaire is completed, the data is stored in PostgreSQL using a combination of structured tables for core data and JSONB fields for flexible, hierarchical data.
+
+This hybrid approach provides:
+1. Simple, client-side progress tracking during completion
+2. Strong data integrity for core entities in the database
+3. Flexible storage for complex, hierarchical questionnaire responses
+4. A clear migration path to server-side session management in future iterations
+
+By focusing on progressive disclosure, smart defaults, and visual assistance, the questionnaire guides users through the complex process of setting up homeschooling schedules while collecting the necessary data to generate personalized, effective schedules tailored to each family's unique situation.
