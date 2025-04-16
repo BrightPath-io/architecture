@@ -265,28 +265,77 @@ The backend will follow Django's architecture with adaptations for PostgreSQL+JS
 
 ### Code Organization
 ```
-api/
-├── brightpath/
-│   ├── settings/
-│   │   ├── base.py
-│   │   ├── development.py
-│   │   └── production.py
-│   ├── urls.py
-│   └── wsgi.py
-├── apps/
-│   ├── users/
-│   ├── children/
-│   ├── schedules/
-│   ├── subjects/
-│   ├── feedback/
-│   └── questionnaire/
-├── ml/
-│   ├── generator/
-│   ├── reward/
-│   └── training/
-├── utils/
-├── manage.py
-└── requirements.txt
+├── BrightPathAPI
+│   ├── Dockerfile
+│   ├── Pipfile
+│   ├── Pipfile.lock
+│   ├── README.md
+│   ├── apps
+│   │   ├── api
+│   │   │   ├── models
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── children.py
+│   │   │   │   ├── families.py
+│   │   │   │   ├── feedback.py
+│   │   │   │   ├── schedules.py
+│   │   │   │   ├── subjects.py
+│   │   │   │   └── users.py
+│   │   │   ├── serializers
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── children.py
+│   │   │   │   ├── families.py
+│   │   │   │   ├── feedback.py
+│   │   │   │   ├── schedules.py
+│   │   │   │   ├── subjects.py
+│   │   │   │   └── users.py
+│   │   │   ├── urls.py
+│   │   │   └── views
+│   │   │       ├── __init__.py
+│   │   │       ├── children.py
+│   │   │       ├── families.py
+│   │   │       ├── feedback.py
+│   │   │       ├── schedules.py
+│   │   │       ├── subjects.py
+│   │   │       └── users.py
+│   │   ├── ml
+│   │   │   ├── generator
+│   │   │   ├── models
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── mlmodels.py
+│   │   │   ├── reward
+│   │   │   ├── reward_model.py
+│   │   │   └── services.py
+│   │   ├── questionnaire
+│   │   │   ├── models
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── questionnaire.py
+│   │   │   ├── serializers
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── questionnaire.py
+│   │   │   ├── services.py
+│   │   │   ├── urls.py
+│   │   │   └── views
+│   │   │       ├── __init__.py
+│   │   │       └── questionnaire.py
+│   │   └── utils
+│   │       ├── middleware.py
+│   │       └── permissions.py
+│   ├── brightpath
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   ├── celery.py
+│   │   ├── settings
+│   │   │   ├── base.py
+│   │   │   ├── development.py
+│   │   │   └── production.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── docker-entrypoint.sh
+│   ├── manage.py
+│   └── requirements
+│       ├── base.txt
+│       ├── development.txt
+│       └── production.txt
 ```
 
 ## Database Design
