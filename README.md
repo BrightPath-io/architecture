@@ -20,8 +20,7 @@ The BrightPath project is organized into the following main directories:
 
 - `/api`: Django backend API
 - `/client`: React frontend application
-- `/db`: Database migrations and scripts
-- `/infrastructure`: Infrastructure as code and deployment configurations
+- `/infrastructure`: Infrastructure as code and deployment configurations including a docker-compose.yml file which also sets up the database
 - `/services`: Additional services including ML models
 
 ## Documentation
@@ -90,84 +89,14 @@ For detailed information about the Docker setup, see [Docker Development Environ
 
 ### Quick Start
 
-1. **Clone the repository**
+1. **Clone the repositories**
 
 ```bash
-git clone https://github.com/your-organization/brightpath.git
-cd brightpath
-```
-
-2. **Create .env file**
-
-Create a `.env` file in the project root with the necessary environment variables (see below).
-
-3. **Start the development environment**
-
-```bash
-docker-compose up
-```
-
-4. **Access the services**
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/api/docs/
-- PgAdmin: http://localhost:5050 (admin@brightpath.com / admin)
-
-### Manual Setup (Alternative)
-
-If you prefer to run services directly on your machine without Docker:
-
-1. **Install dependencies**
-   - Python 3.12+
-   - Node.js 16+
-   - PostgreSQL
-   - Valkey
-
-2. **Set up the backend**
-
-```bash
-cd api
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements/development.txt
-python manage.py migrate
-python manage.py runserver
-```
-
-3. **Set up the frontend**
-
-```bash
-cd client
-npm install
-npm run dev
-```
-
-### Environment Variables
-
-Create a `.env` file in the project root with the following variables:
-
-```
-# Django settings
-DEBUG=True
-SECRET_KEY=your-secret-key
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database settings
-DB_NAME=brightpath
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_HOST=localhost
-DB_PORT=5432
-
-# Google OAuth settings
-GOOGLE_OAUTH_CLIENT_ID=your-client-id
-GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
-
-# Valkey settings
-VALKEY_HOST=localhost
-VALKEY_PORT=6379
-VALKEY_DB=0
+mkdir bright_path_project
+cd bright_path_project
+git clone git@github.com:BrightPath-io/BrightPathWeb.git
+git clone git@github.com:BrightPath-io/BrightPathAPI.git
+git clone git@github.com:BrightPath-io/infrastructure.git
 ```
 
 ## Development Workflow

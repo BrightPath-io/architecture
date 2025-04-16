@@ -4,7 +4,7 @@
 
 BrightPath is an innovative homeschooling scheduling platform that leverages artificial intelligence and machine learning to help parents create and maintain personalized educational schedules for their children. The platform addresses the unique challenges faced by homeschooling families by providing intelligent scheduling recommendations based on individual learning styles, family constraints, and educational goals.
 
-This document provides a high-level summary of the BrightPath project, including its vision, architecture, implementation approach, and development roadmap. It incorporates the revised technology stack based on stakeholder feedback.
+This document provides a high-level summary of the BrightPath project, including its vision, architecture, implementation approach, and development roadmap. It incorporates the revised technology stack and database strategy based on stakeholder feedback and further technical analysis.
 
 ## Vision and Mission
 
@@ -50,7 +50,7 @@ BrightPath is designed primarily for homeschooling parents like Sarah Kim, a 29-
 
 ## Revised Technology Stack
 
-Based on stakeholder feedback, the technology stack has been updated to better align with project requirements and team preferences.
+Based on stakeholder feedback and technical analysis, the technology stack has been updated to better align with project requirements and team preferences.
 
 ### Frontend
 - **JavaScript** with React 18+
@@ -62,9 +62,9 @@ Based on stakeholder feedback, the technology stack has been updated to better a
 ### Backend
 - **Django** with **Python 3.12**
 - **Django REST Framework** for API development
-- **PostgreSQL** for database
+- **PostgreSQL** with **JSONB fields** for persistent storage
+- **Local Storage** for onboarding questionnaire progress in the initial prototype
 - **Google OAuth** for authentication
-- **Valkey** for message bus and task processing
 
 ### Machine Learning
 - **scikit-learn** for initial models
@@ -81,33 +81,40 @@ Based on stakeholder feedback, the technology stack has been updated to better a
 
 ## System Architecture
 
-BrightPath follows a modern, scalable architecture with clear separation of concerns:
+BrightPath follows a modern, scalable architecture with clear separation of concerns. The revised architecture now includes PostgreSQL with JSONB fields for flexible data storage, with browser local storage used for questionnaire progress in the initial prototype:
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  React Frontend │────▶│  Django API     │────▶│  Database       │
-│  (Vite)         │◀────│  (REST)         │◀────│  (PostgreSQL)   │
+│  React Frontend │────▶│  Django API     │────▶│  PostgreSQL     │
+│  (Vite)         │◀────│  (REST)         │◀────│  (with JSONB)   │
 │                 │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │   ▲
-                               ▼   │
-                        ┌─────────────────┐
-                        │                 │
-                        │  ML Services    │
-                        │                 │
-                        └─────────────────┘
+        │                        │                       
+        │                        │                       
+        ▼                        ▼                       
+┌─────────────────┐     ┌─────────────────┐     
+│                 │     │                 │     
+│  Local Storage  │     │  ML Services    │     
+│  (Questionnaire)│     │                 │     
+└─────────────────┘     └─────────────────┘     
 ```
 
-The architecture consists of four main components:
+The architecture consists of five main components:
 
 1. **Frontend Application:** A responsive React-based single-page application that provides an intuitive user interface for schedule creation, management, and feedback.
 
 2. **Backend API:** A Django REST Framework API that handles user authentication, data management, and business logic.
 
-3. **Database:** A PostgreSQL database that stores user data, schedules, and application state.
+3. **Database (PostgreSQL with JSONB):** A robust relational database that leverages JSONB fields to combine structured data integrity with document flexibility. This approach provides:
+   - Structured tables for core data (users, families, children, subjects)
+   - JSONB fields for complex hierarchical data (preferences, schedules)
+   - Strong transaction guarantees across all data
+   - Advanced querying capabilities for both relational and document data
 
-4. **ML Services:** Machine learning models for schedule generation and optimization, with a feedback loop for continuous improvement.
+4. **Local Storage (Browser):** Used for storing questionnaire progress during onboarding in the initial prototype, allowing users to save and continue the questionnaire across sessions.
+
+5. **ML Services:** Machine learning models for schedule generation and optimization, with a feedback loop for continuous improvement.
 
 ## Authentication Strategy
 
@@ -142,21 +149,68 @@ BrightPath will use Radix UI for its component library, providing accessible, co
    - Flexibility in styling
    - Reduced development time for complex components
 
-## Message Processing Strategy
+## Database Strategy
 
-BrightPath will use Valkey as the message bus for asynchronous task processing:
+BrightPath will use PostgreSQL with JSONB fields for persistent storage, with browser local storage for questionnaire progress in the initial prototype:
 
-1. **Task Processing Architecture:**
-   - Valkey for message storage and distribution
-   - Worker processes for task execution
-   - Task queues for different types of operations
-   - Result storage and retrieval
+1. **PostgreSQL with JSONB for Persistent Storage:**
+   - Structured tables for core entities (users, families, children, subjects)
+   - JSONB fields for flexible data (preferences, questionnaire responses, schedules)
+   - Best of both worlds: Schema enforcement where needed, flexibility where appropriate
+   - Strong transaction guarantees and referential integrity
 
-2. **Benefits:**
-   - Improved performance over traditional message brokers
-   - Simplified deployment and management
-   - Reliable message delivery
-   - Scalable processing capacity
+2. **Key Data Storage Areas:**
+   - Family profiles and preferences (structured + JSONB)
+   - Child information and learning styles (structured + JSONB)
+   - Subject and activity definitions (structured)
+   - Generated schedules (structured references + JSONB for schedule details)
+   - Activity completion logs (structured + JSONB for flexible details)
+   - ML model parameters and training data (structured + JSONB)
+   - Final questionnaire responses (JSONB)
+
+3. **Local Storage for Questionnaire Progress:**
+   - Draft questionnaire responses
+   - Section completion status
+   - Current position in the questionnaire flow
+   - Temporary user preferences during onboarding
+
+4. **Benefits:**
+   - Single database to maintain and scale
+   - Schema flexibility for evolving requirements
+   - Strong transaction guarantees for all operations
+   - Simplified initial implementation using local storage
+   - No need for additional infrastructure in the prototype phase
+   - Advanced querying capabilities for both structured and document data
+
+## Questionnaire Design
+
+The BrightPath onboarding questionnaire follows a TurboTax-like experience to gather essential information for personalized schedule generation:
+
+1. **Key Design Principles:**
+   - Progressive disclosure - Questions are organized in logical sections
+   - Smart defaults - Age-appropriate suggestions based on child's age
+   - Visual assistance - Examples and visual aids enhance understanding
+   - Save progress - Automatic saving to local storage for later continuation
+
+2. **Multi-Child Support:**
+   - Family-wide sections collected once
+   - Child-specific sections repeated for each child
+   - Clear navigation between children and sections
+
+3. **Core Sections:**
+   - Parent/Guardian Information
+   - Child Information
+   - Commitments & Obligations
+   - Subjects & Activities
+   - Schedule Flexibility
+   - Preferred Learning Times
+   - Learning & Teaching Preferences
+
+4. **Implementation:**
+   - Draft responses stored in browser local storage
+   - Final responses committed to PostgreSQL JSONB fields
+   - Progress tracking across browser sessions
+   - Smart validation and suggestions
 
 ## Machine Learning Approach
 
@@ -187,9 +241,9 @@ These models work together in a continuous improvement loop:
 
 The development of BrightPath follows an iterative, phased approach:
 
-1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create basic database schema.
+1. **Foundation Phase:** Establish project infrastructure, implement core authentication, and create database schemas for PostgreSQL with JSONB fields.
 
-2. **Core Functionality Phase:** Implement onboarding questionnaire, schedule management, and initial rule-based schedule generation.
+2. **Core Functionality Phase:** Implement onboarding questionnaire with local storage, schedule management, and initial rule-based schedule generation.
 
 3. **ML Integration Phase:** Develop ML models, create feedback collection system, and implement continuous improvement pipeline.
 
@@ -208,8 +262,9 @@ BrightPath will be deployed on Digital Ocean, providing a cost-effective and str
    - Digital Ocean App Platform for orchestration
 
 2. **Database Strategy:**
-   - Digital Ocean Managed Databases for PostgreSQL
-   - Automated backups and point-in-time recovery
+   - Digital Ocean Managed PostgreSQL database
+   - Browser local storage for questionnaire progress in the prototype
+   - Automated backups and point-in-time recovery for PostgreSQL
    - Connection pooling for performance
 
 3. **Monitoring and Logging:**
@@ -236,7 +291,7 @@ As a platform that may collect information related to children, BrightPath imple
 
 The following detailed documents have been created to guide the implementation of BrightPath:
 
-1. **[Architecture Plan](BrightPath_Architecture_Plan.md):** Comprehensive overview of the system architecture, components, and interactions.
+1. **[Architecture Plan](brightpath_architecture_plan.md):** Comprehensive overview of the system architecture, components, and interactions.
 
 2. **[Frontend Implementation Plan](frontend_implementation_plan.md):** Detailed plan for implementing the React frontend application.
 
@@ -246,15 +301,19 @@ The following detailed documents have been created to guide the implementation o
 
 5. **[Revised Technology Stack](revised_technology_stack.md):** Updated technology choices based on stakeholder feedback.
 
-6. **[Docker Development Environment](docker_development_environment.md):** Detailed guide for the Dockerized development setup.
+6. **[Questionnaire Design](brightpath_questionnaire.md):** Comprehensive design of the BrightPath onboarding questionnaire.
 
-7. **[Terraform Infrastructure Plan](terraform_infrastructure_plan.md):** Comprehensive strategy for provisioning Digital Ocean infrastructure using Terraform.
+7. **[Database Design](brightpath_database_design.md):** Detailed database strategy using PostgreSQL with JSONB fields.
 
-8. **[Development Roadmap](development_roadmap.md):** Timeline and milestones for the phased implementation approach.
+8. **[Terraform Infrastructure Plan](terraform_infrastructure_plan.md):** Comprehensive strategy for provisioning Digital Ocean infrastructure using Terraform.
 
-9. **[Testing Strategy](testing_strategy.md):** Comprehensive approach to ensuring quality through various testing methodologies.
+9. **[Docker Development Environment](docker_development_environment.md):** Detailed guide for the Dockerized development setup.
 
-10. **[Deployment Strategy](deployment_strategy.md):** Plan for deploying, scaling, and maintaining the application in production.
+10. **[Development Roadmap](development_roadmap.md):** Timeline and milestones for the phased implementation approach.
+
+11. **[Testing Strategy](testing_strategy.md):** Comprehensive approach to ensuring quality through various testing methodologies.
+
+12. **[Deployment Strategy](deployment_strategy.md):** Plan for deploying, scaling, and maintaining the application in production.
 
 ## Future Enhancements
 
@@ -283,9 +342,15 @@ Beyond the initial implementation, BrightPath has potential for several exciting
    - Offline functionality
    - Push notifications
    - Location-based educational opportunities
+   
+5. **Enhanced Session Management:**
+   - Server-side questionnaire progress tracking
+   - Real-time updates and synchronization
+   - Multi-device session support
+   - Analytics on questionnaire completion rates
 
 ## Conclusion
 
 BrightPath represents a significant opportunity to transform the homeschooling experience by leveraging modern technology to address the unique challenges faced by homeschooling families. By providing intelligent, personalized scheduling recommendations and continuous improvement through user feedback, BrightPath aims to become an essential tool that empowers parents to create effective, engaging educational experiences for their children.
 
-The revised technology stack aligns with stakeholder preferences while maintaining the core functionality and architecture of the platform. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.
+The revised technology stack and database strategy, using PostgreSQL with JSONB fields and browser local storage for questionnaire progress in the initial prototype, align with stakeholder preferences while enhancing the core functionality and architecture of the platform. This approach simplifies the initial implementation while maintaining the ability to scale and enhance the platform in future iterations. With these updates in place, BrightPath is well-positioned to deliver on its mission of supporting and empowering homeschooling parents on their educational journey.
